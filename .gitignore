@@ -1,0 +1,20 @@
+# Gradle
+.gradle/
+build/
+.kotlin/
+.intellijPlatform/
+
+# Keep the Gradle wrapper (jar + properties), ignore only the downloaded distribution
+!gradle/wrapper/gradle-wrapper.jar
+
+# IntelliJ / IDEA
+.idea/
+*.iml
+*.iml.bak
+out/
+
+# Local config
+local.properties
+
+# OS
+.DS_Store

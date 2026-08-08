@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="tile" x1="6" y1="6" x2="122" y2="122" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6E5BFF"/>
+      <stop offset="1" stop-color="#3D2FD6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 圆角磁贴背景 -->
+  <rect x="6" y="6" width="116" height="116" rx="28" fill="url(#tile)"/>
+
+  <!-- agent 节点网络（右上角：三个互联节点 = 多 agent） -->
+  <g stroke="#FFFFFF" stroke-opacity="0.85" stroke-width="2" fill="#FFFFFF">
+    <line x1="98" y1="32" x2="92" y2="52"/>
+    <line x1="92" y1="52" x2="112" y2="52"/>
+    <circle cx="98" cy="32" r="4"/>
+    <circle cx="92" cy="52" r="4"/>
+    <circle cx="112" cy="52" r="4"/>
+  </g>
+
+  <!-- 火花 sparkle（左上角，红色呼应 skip-y 红） -->
+  <path d="M30 23 L33 30 L40 33 L33 36 L30 43 L27 36 L20 33 L27 30 Z" fill="#FF5261"/>
+
+  <!-- 小写 y（主体，圆头描边） -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M42 46 L64 72"/>
+    <path d="M86 46 L64 72"/>
+    <path d="M64 72 L64 98 Q64 106 54 106"/>
+  </g>
+</svg>
