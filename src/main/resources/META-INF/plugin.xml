@@ -19,6 +19,8 @@
     <!-- 仅在本机实测过的 2026.2 (build 262) 起支持终端 AI Agents 这套扩展点；
          用户要求从 2026.1 (build 261) 起支持。until-build 不锁，避免挡住后续小版本。 -->
     <idea-version since-build="261"/>
+    <!-- 声明平台模块依赖，避免被当作 legacy plugin 仅能在 IntelliJ IDEA 加载的警告 -->
+    <depends>com.intellij.modules.platform</depends>
     <depends>org.jetbrains.plugins.terminal</depends>
 
     <!-- 所有用户可见文案的默认（英文）资源包；YoloBundle_zh.properties 提供中文。
