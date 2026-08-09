@@ -13,6 +13,9 @@ This plugin addresses both.
 
 ### Extend the AI Agents dropdown
 
+![yolo-more-agents.png](screenshots/yolo-more-agents.png)
+
+
 Add any AI CLI — Gemini, Copilot, Cursor, Cline, OpenCode, or something you wrote yourself — to the
 Terminal's AI Agents menu, with its own display name and icon. IDEA's built-in agents are never
 replaced or reordered; your tools are appended.
@@ -22,6 +25,8 @@ rule, not the plugin's — the Settings table greys out the icon of anything it 
 see at a glance what's actually installed.
 
 ### YOLO mode
+
+![yolo-mode.png](screenshots/yolo-mode.png)
 
 A **YOLO (Skip Permissions)** toggle sits in the Terminal toolbar, immediately left of the AI Agents
 dropdown. Turn it on and the next agent you launch starts with its permission-bypass flag appended —
@@ -73,6 +78,8 @@ Building it yourself:
 ## Configuration
 
 **`Settings | Tools | YOLO: AI Agents Extender`** — or click the gear in the Terminal toolbar.
+
+![yolo-settings.png](screenshots/yolo-settings.png)
 
 Everything lives in one table. Each row is an agent, and each row carries its own skip flag:
 
