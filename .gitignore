@@ -16,5 +16,8 @@ out/
 # Local config
 local.properties
 
+# Development notes - not published yet
+docs/
+
 # OS
 .DS_Store
