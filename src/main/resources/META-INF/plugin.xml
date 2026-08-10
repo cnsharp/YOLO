@@ -4,7 +4,7 @@
          plugin.name 读取并覆写，产品名只在那一个 key 里维护。此处仅为占位。 -->
     <name>YOLO: AI Agents Extender</name>
     <!-- <version> 同样由构建时注入：来自 gradle.properties 的 pluginVersion。此处仅为占位。 -->
-    <version>1.0.0</version>
+    <version>0.1.0</version>
     <vendor email="support@cnsharp.com" url="">CnSharp Studio</vendor>
     <description><![CDATA[
 <p><b>YOLO</b> extends IntelliJ IDEA's Terminal <b>AI Agents</b> dropdown with your own tools, and lets you launch them in <b>YOLO mode</b> with a single click.</p>
