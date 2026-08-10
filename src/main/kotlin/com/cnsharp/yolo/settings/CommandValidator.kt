@@ -3,9 +3,9 @@ package com.cnsharp.yolo.settings
 import com.cnsharp.yolo.YoloBundle.message
 
 /**
- * 校验自定义工具的「命令」是否可解析：确认它在 PATH / 绝对路径上找得到、且真的能执行。
- * 实际会真正运行一次 "<command> --version"（经 AgentDetector.isOnPath，
- * 用登录 shell 兼容 nvm / Homebrew 注入的 PATH），按退出码判断二进制是否真的存在。
+ * 校验自定义工具的「命令」是否可解析：确认它在 PATH / 绝对路径上找得到。
+ * 经 AgentDetector.isOnPath 直接用 command -v / where 解析（登录 shell 兼容
+ * nvm / Homebrew 注入的 PATH），不实际执行命令本身。
  */
 object CommandValidator {
 
