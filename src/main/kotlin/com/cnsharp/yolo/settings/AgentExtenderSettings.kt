@@ -42,11 +42,13 @@ object DefaultSkipFlags {
         "qoder"     to "--dangerously-skip-permissions",
         "hermes"    to "--yolo",
         "opencode"  to "--auto",
+        "pi"        to "--approve",        // pi: trust project-local files for this run
         "cn"        to "--auto",           // continue binary is 'cn'
         "cline"     to "--auto-approve true",
         // Agents below have no launch-time bypass flag; see DefaultSkipEnvs for env-based ones.
         // kilo: only 'kilo run' accepts --dangerously-skip-permissions; bare TUI does not.
         // openclaw: only persistent config ('openclaw exec-policy preset yolo').
+        // pi: --approve trusts project-local files (AGENTS.md/SYSTEM.md/skills) for this run.
     )
     /** Returns the flag string, or empty if no known flag exists for this binary. */
     fun forId(id: String): String = map[id.lowercase()] ?: ""
@@ -88,6 +90,7 @@ object PromotedAgents {
         Meta("kimi",      "Kimi",     "kimi"),
         Meta("openclaw",  "OpenClaw","openclaw"),
         Meta("opencode",  "OpenCode", "opencode"),
+        Meta("pi",        "Pi",       "pi"),
         Meta("qoder",     "Qoder",    "qoder")
     )
 }
