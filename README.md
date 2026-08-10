@@ -70,8 +70,17 @@ Building it yourself:
 
 ```bash
 ./gradlew buildPlugin
-# → build/distributions/yolo-1.0.0.zip
+# → build/distributions/yolo-{version}.zip
 ```
+
+### Releases
+
+This plugin relies heavily on IntelliJ **Internal** APIs — the Terminal AI Agents extension points
+it hooks into are marked internal. Plugins that depend on internal API are rejected by JetBrains
+Marketplace verification, so **this plugin is not published to the Marketplace**.
+
+Get builds from the **Releases** page of this repository: download the `yolo-<version>.zip` and
+install it with *Install Plugin from Disk…* as described above.
 
 ---
 
