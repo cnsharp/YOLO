@@ -30,7 +30,7 @@ jobs:
           CI: "true"   # build.gradle.kts uses this to download IntelliJ Platform instead of a local install
         run: |
           chmod +x gradlew
-          ./gradlew buildPlugin -PpluginVersion="${GITHUB_REF_NAME#v}"
+          ./gradlew buildPlugin -PpluginVersion="${GITHUB_REF_NAME#v}" --info
 
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2
