@@ -44,8 +44,9 @@ intellijPlatform {
 repositories {
     mavenCentral()
     intellijPlatform {
-        // 本地 IDE 的 bundled 插件（acp / terminal）通过本地 Ivy 仓库解析
-        localPlatformArtifacts()
+        // 本地 IDE 的 bundled 插件（acp / terminal）通过本地 Ivy 仓库解析（离线构建用）。
+        // 本地用：取消下一行注释，并注释掉 dependencies 里的 intellijPlatform.idea(...)。
+        // localPlatformArtifacts()
         // 代码插桩（instrumentCode）所需的 java-compiler-ant-tasks 来自 JetBrains Maven 仓库
         releases()
         intellijDependencies()
@@ -53,8 +54,11 @@ repositories {
 }
 
 dependencies {
-    // 直接以本机 IDEA 安装目录作为 IntelliJ Platform 依赖
-    intellijPlatform.local(file("/Applications/IntelliJ IDEA.app"))
+    // 直接以本机 IDEA 安装目录作为 IntelliJ Platform 依赖（离线构建，不下载）。
+    // 本地用：取消下一行注释，并注释掉 intellijPlatform.idea(...) 那行，同时恢复 repositories 里的 localPlatformArtifacts()。
+    // intellijPlatform.local(file("/Applications/IntelliJ IDEA.app"))
+    // CI / Release 工作流（无本机 IDEA）：下载 IntelliJ Platform 进行构建
+    intellijPlatform.idea("2026.2")
     intellijPlatform.bundledPlugin("org.jetbrains.plugins.terminal")
 }
 
