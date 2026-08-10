@@ -39,7 +39,8 @@ object AgentIcons {
         "cline"     to "/icons/agents/cline.png",
         "kilo"      to "/icons/agents/kilo.svg",
         "goose"     to "/icons/agents/goose.png",
-        "openclaw"  to "/icons/agents/openclaw.svg"
+        "openclaw"  to "/icons/agents/openclaw.svg",
+        "pi"        to "/icons/agents/pi.svg"
     )
 
     /** Skip permissions 勾选框的 y 图标（关/开）。 */

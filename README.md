@@ -32,7 +32,7 @@ A **YOLO (Skip Permissions)** toggle sits in the Terminal toolbar, immediately l
 dropdown. Turn it on and the next agent you launch starts with its permission-bypass flag appended —
 `--dangerously-skip-permissions` for Claude Code, `--yolo` for Codex, `-y` for CodeBuddy, and so on.
 
-The flag is **per agent** and fully configurable. The plugin knows the correct flag for 16 common
+The flag is **per agent** and fully configurable. The plugin knows the correct flag for 17 common
 agents and pre-fills it, but every value is editable and nothing is hardcoded at runtime. A few
 agents (Goose) bypass via an environment variable instead of a flag; those are handled too, since an
 env var has to be set before the process starts rather than appended to the command line.
@@ -110,8 +110,7 @@ the dropdown, not take it over.
 - **Duplicates are caught while you type.** A repeated ID or command turns the status line red
   immediately, and Apply refuses to save. Commands are compared by executable name, so
   `/usr/bin/claude` and `claude.cmd` count as the same tool.
-- **First run detects what you have.** Installed agents are found on `PATH` in the background and
-  added for you.
+- **First run pre-fills known agents.** On first run, the plugin scans `PATH` in the background and adds the built-in and promoted agents it finds installed. It does **not** auto-discover arbitrary tools you wrote yourself — add those as custom tools.
 - **Validate** checks a row's command against `PATH` and downloads its icon URL if it has one.
 
 ### Known agents
@@ -137,6 +136,7 @@ source of truth. What runs is whatever the settings say.
 | Goose | `goose` | env `GOOSE_MODE=auto` — not a flag |
 | Kilo Code | `kilo` | none — only `kilo run` accepts one |
 | OpenClaw | `openclaw` | none — persistent config only |
+| Pi | `pi` | `--approve` |
 
 Anything not listed here works fine as a custom tool; just fill in its flag yourself.
 
