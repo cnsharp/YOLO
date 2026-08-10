@@ -1,4 +1,5 @@
 import org.jetbrains.intellij.platform.gradle.extensions.intellijPlatform
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import java.util.Properties
 
 plugins {
@@ -44,22 +45,23 @@ intellijPlatform {
 repositories {
     mavenCentral()
     intellijPlatform {
-        // 本地 IDE 的 bundled 插件（acp / terminal）通过本地 Ivy 仓库解析（离线构建用）。
-        // 本地用：取消下一行注释，并注释掉 dependencies 里的 intellijPlatform.idea(...)。
+        // JetBrains 官方仓库：IntelliJ Platform 与 bundled 插件（terminal 等）从这里解析
+        defaultRepositories()
+        // 本地离线构建用：从本机已装 IDEA 解析 bundled 插件（与 dependencies 里的 local(...) 配套）。
+        // 本地用：取消下一行注释。
         // localPlatformArtifacts()
-        // 代码插桩（instrumentCode）所需的 java-compiler-ant-tasks 来自 JetBrains Maven 仓库
-        releases()
-        intellijDependencies()
     }
 }
 
 dependencies {
-    // 直接以本机 IDEA 安装目录作为 IntelliJ Platform 依赖（离线构建，不下载）。
-    // 本地用：取消下一行注释，并注释掉 intellijPlatform.idea(...) 那行，同时恢复 repositories 里的 localPlatformArtifacts()。
-    // intellijPlatform.local(file("/Applications/IntelliJ IDEA.app"))
-    // CI / Release 工作流（无本机 IDEA）：下载 IntelliJ Platform 进行构建
-    intellijPlatform.idea("2026.2")
-    intellijPlatform.bundledPlugin("org.jetbrains.plugins.terminal")
+    intellijPlatform {
+        // CI / Release 工作流（无本机 IDEA）：下载 IntelliJ Platform 进行构建
+        // 用 Ultimate 以匹配本机开发环境（TerminalAgentProvider 等内部 API 在此可解析）
+        create(IntelliJPlatformType.IntellijIdeaUltimate, "2026.2")
+        // 本地离线构建：取消下一行注释，并注释掉上面的 intellijIdea(...) 那行
+        // local(file("/Applications/IntelliJ IDEA.app"))
+        bundledPlugin("org.jetbrains.plugins.terminal")
+    }
 }
 
 kotlin {
