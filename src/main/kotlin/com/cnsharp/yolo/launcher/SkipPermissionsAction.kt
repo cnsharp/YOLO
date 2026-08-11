@@ -10,11 +10,11 @@ import javax.swing.Icon
 /**
  * Global "Skip permissions" toggle state (stored in Settings).
  *
- * Installed into the terminal title bar by SkipToggleToolWindowInitializer via the toolWindowInitializer
- * extension point, right next to the left of the AI Agents dropdown.
+ * Shown in the YOLO panel header (added by YoloToolWindowFactory) as a toolbar ToggleAction,
+ * next to the settings gear.
  *
- * The icon is a lowercase y: gray when off, red when on — visually consistent with the built-in
- * checkbox/toggle behavior, but the custom icon lets users immediately recognize this as the "skip permissions" switch.
+ * The icon is a lowercase y: gray when off, red when on — visually consistent with a checkbox/toggle,
+ * but the custom icon lets users immediately recognize this as the "skip permissions" switch.
  */
 /* Text is not hardcoded here: the <action> in plugin.xml already declares <resource-bundle>,
  * so the platform reads action.<id>.text / .description from YoloBundle and follows IDE language switching. */

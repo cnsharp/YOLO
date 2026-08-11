@@ -20,7 +20,6 @@ import com.intellij.ui.components.panels.HorizontalLayout
 import com.intellij.ui.table.JBTable
 import com.cnsharp.yolo.util.baseName
 import com.intellij.util.ui.FormBuilder
-import org.jetbrains.plugins.terminal.agent.TerminalAgent
 import javax.swing.event.TableModelEvent
 import java.awt.Component
 import java.awt.image.BufferedImage
@@ -39,11 +38,10 @@ import javax.swing.table.TableCellRenderer
  * Settings | Tools | YOLO: AI Agents Extender
  *
  * A single merged agent list, where each row can configure its own "Skip flag" (permission-skip argument):
- *   - IDEA built-in agents (dynamically taken from TerminalAgentProvider; read-only, cannot be removed, icon from IDEA)
- *   - Agents promoted by this plugin (e.g. codebuddy; read-only, cannot be removed)
+ *   - Agents promoted by this plugin (e.g. Claude Code, Codex, codebuddy; read-only, cannot be removed)
  *   - User custom tools (editable, addable/removable, icon specifiable)
- * The value of the "Skip flag" column is injected after the agent's launch command when the terminal toolbar's
- * "Skip permissions" is checked.
+ * The value of the "Skip flag" column is appended to the agent's launch command when the YOLO panel's
+ * "Skip permissions" toggle is on.
  * Installed agents (on PATH) show their icon lit; uninstalled agents show a greyed icon. If an icon exists it is
  * shown, otherwise a default lightning bolt is used.
  */
@@ -60,10 +58,7 @@ class AgentExtenderConfigurable : Configurable {
 
     private val toolsTable = AgentsTable(toolsModel)
 
-    /** Lowercased id set of built-in agents and id->icon map, refreshed on reset(); used for judging/rendering. */
-    private var builtInIds: Set<String> = emptySet()
-    private var builtInIconById: Map<String, Icon?> = emptyMap()
-    /** Lowercased id set of agents promoted by this plugin (e.g. codebuddy): like built-ins, read-only, not removable, icon fixed. */
+    /** Lowercased id set of agents promoted by this plugin (e.g. claude/codex/codebuddy): read-only, not removable, icon fixed. */
     private var promotedIds: Set<String> = emptySet()
 
     private val statusLabel = JLabel("")
@@ -118,7 +113,7 @@ class AgentExtenderConfigurable : Configurable {
     private fun isLockedAgent(row: Int): Boolean {
         if (row < 0) return false
         val id = (toolsModel.getValueAt(row, COL_ID) as? String)?.trim()?.lowercase() ?: ""
-        return id in builtInIds || id in promotedIds
+        return id in promotedIds
     }
 
     // ── Buttons ──────────────────────────────────────────────────────
@@ -407,14 +402,12 @@ class AgentExtenderConfigurable : Configurable {
         }
         settings.state.permissionRules = newRules
 
-        // ② Custom tools: skip built-in/promoted (they are not written to customTools); only save user custom tools
-        val builtInCmds = BuiltInAgents.all().map { it.binaryName.lowercase() }.toSet()
+        // ② Custom tools: skip promoted agents (they are not written to customTools); only save user custom tools
         settings.state.customTools = (0 until toolsModel.rowCount).mapNotNull { r ->
             val id = (toolsModel.getValueAt(r, COL_ID) as? String)?.trim() ?: ""
             val command = (toolsModel.getValueAt(r, COL_COMMAND) as? String)?.trim() ?: ""
             if (id.isBlank() || command.isBlank()) null
-            else if (id.lowercase() in builtInIds) null
-            else if (command.lowercase() in builtInCmds) null
+            else if (id.lowercase() in promotedIds) null
             else CustomTool(
                 id = id,
                 displayName = (toolsModel.getValueAt(r, COL_DISPLAY) as? String)?.trim() ?: id,
@@ -480,30 +473,16 @@ class AgentExtenderConfigurable : Configurable {
             /** Prefer the user-saved rule; fall back to DefaultSkipFlags (by command name, then by id) if empty. */
             fun flagFor(cmd: String, id: String = ""): String {
                 val saved = ruleByCmd[baseName(cmd).lowercase()]
-                if (!saved.isNullOrBlank()) return saved
+                if (!saved.isNullOrBlank()) return@flagFor saved
                 return DefaultSkipFlags.forId(baseName(cmd)).ifBlank {
                     DefaultSkipFlags.forId(id)
                 }
             }
 
-            // ① IDEA built-in (dynamic)
-            val builtIns: List<TerminalAgent> = BuiltInAgents.all()
-            builtInIds = builtIns.map { it.agentKey.key.lowercase() }.toSet()
-            builtInIconById = builtIns.associate { it.agentKey.key.lowercase() to it.icon }
-            val builtInCmds = builtIns.map { it.binaryName.lowercase() }.toSet()
+            // ① Promoted by this plugin (e.g. claude/codex/codebuddy): in PromotedAgents.entries order (Claude Code, Codex pinned Top 2),
+            //    read-only, not removable, icon fixed.
             promotedIds = PromotedAgents.entries.map { it.id.lowercase() }.toSet()
-            // IDEA built-in (dynamic): add row by row (keep IDEA's native order, highest priority)
-            for (agent in builtIns) {
-                val id = agent.agentKey.key
-                toolsModel.addRow(
-                    arrayOf<Any>(
-                        "", id, agent.displayName, agent.binaryName,
-                        "", flagFor(agent.binaryName, id), ""
-                    )
-                )
-            }
-            // ② Promoted by this plugin (e.g. codebuddy): sorted by id first letter; priority below built-in, above user custom
-            for (meta in PromotedAgents.entries.sortedBy { it.id.lowercase() }) {
+            for (meta in PromotedAgents.entries) {
                 toolsModel.addRow(
                     arrayOf<Any>(
                         "", meta.id, meta.displayName, meta.command,
@@ -511,14 +490,12 @@ class AgentExtenderConfigurable : Configurable {
                     )
                 )
             }
-            // ③ User custom tools (skip entries whose id duplicates built-in/promoted, or that share a command with legacy entries).
+            // ② User custom tools (skip entries whose id duplicates a promoted agent).
             //    Sorted by creation time — each user addition appends to the list end, there is no row-reorder UI, so saved
             //    order equals creation order; just add in state.customTools order (lowest priority).
             for (tool in state.customTools) {
                 val lid = tool.id.lowercase()
-                val cmd = tool.command.lowercase()
-                if (lid in builtInIds || lid in promotedIds) continue
-                if (cmd in builtInCmds) continue
+                if (lid in promotedIds) continue
                 toolsModel.addRow(
                     arrayOf<Any>(
                         "", tool.id, tool.displayName, tool.command,
@@ -553,7 +530,7 @@ class AgentExtenderConfigurable : Configurable {
             if (table != null && row in 0 until toolsModel.rowCount) {
                 val id = (toolsModel.getValueAt(row, COL_ID) as? String)?.lowercase() ?: ""
                 val iconPath = (toolsModel.getValueAt(row, COL_ICON_PATH) as? String) ?: ""
-                val baseIcon = builtInIconById[id] ?: AgentIcons.forAgent(id, iconPath)
+                val baseIcon = AgentIcons.forAgent(id, iconPath)
                 val installed = toolsTable.installedFlags.getOrElse(row) { false }
                 label.icon = if (installed) baseIcon else greyed(baseIcon)
             }
@@ -589,7 +566,7 @@ class AgentExtenderConfigurable : Configurable {
             if (column == COL_ID || column == COL_COMMAND) {
                 val id = (model.getValueAt(row, COL_ID) as? String)?.trim()?.lowercase() ?: ""
                 // Built-in / promoted agents' ID / Command are fixed and not editable
-                if (id in builtInIds || id in promotedIds) return false
+                if (id in promotedIds) return false
             }
             return super.isCellEditable(row, column)
         }

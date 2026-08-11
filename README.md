@@ -1,45 +1,50 @@
 # YOLO: AI Agents Extender
 
-An IntelliJ IDEA plugin that extends the Terminal's **AI Agents** dropdown with your own CLI tools,
-and lets you launch any of them in **YOLO mode** — with their permission-bypass flag — from a single toggle.
+An IntelliJ IDEA plugin that gives you a standalone **YOLO** panel — a dedicated tool window (right side, **y** icon)
+that lists your AI CLI tools and lets you launch any of them in **YOLO mode** (skip-permissions) with a single click.
 
-IDEA ships the dropdown with Junie, Claude Code and Codex. If your agent of choice isn't one of
-those, it isn't there. And whichever agent you use, you still confirm every action it takes.
-This plugin addresses both.
+It is built entirely on **public IntelliJ APIs**, so it passes JetBrains Marketplace verification and can be published
+like any normal plugin. It does **not** hook into or depend on IDEA's Terminal plugin.
+
+![yolo-panel.png](screenshots/yolo-panel.png)
 
 ---
 
 ## Features
 
-### Extend the AI Agents dropdown
+### The YOLO panel
 
-![yolo-more-agents.png](screenshots/yolo-more-agents.png)
+A tool window (right side, **y** icon) that replicates the Terminal's **AI Agents** experience without touching
+any internal Terminal API:
 
-
-Add any AI CLI — Gemini, Copilot, Cursor, Cline, OpenCode, or something you wrote yourself — to the
-Terminal's AI Agents menu, with its own display name and icon. IDEA's built-in agents are never
-replaced or reordered; your tools are appended.
-
-An agent only appears in the dropdown if its command resolves on `PATH`. That's the terminal's own
-rule, not the plugin's — the Settings table greys out the icon of anything it can't find, so you can
-see at a glance what's actually installed.
+- Lists every configured agent — promoted agents (Claude Code, Codex, CodeBuddy, …) plus your own custom tools.
+- **Claude Code** and **Codex** are pinned at the top of the list.
+- Each row shows the agent's icon, name, and its configured skip flag; rows whose command isn't on `PATH` are dimmed.
+- A **YOLO (Skip Permissions)** toggle sits in the panel header, left of the settings gear.
 
 ### YOLO mode
 
-![yolo-mode.png](screenshots/yolo-mode.png)
+A **YOLO (Skip Permissions)** toggle in the panel header. Turn it on and the next Launch starts the agent with its
+permission-bypass flag appended — `--dangerously-skip-permissions` for Claude Code, `--yolo` for Codex, `-y` for
+CodeBuddy, and so on.
 
-A **YOLO (Skip Permissions)** toggle sits in the Terminal toolbar, immediately left of the AI Agents
-dropdown. Turn it on and the next agent you launch starts with its permission-bypass flag appended —
-`--dangerously-skip-permissions` for Claude Code, `--yolo` for Codex, `--allow-all` for Copilot, and so on.
-
-The flag is **per agent** and fully configurable. The plugin knows the correct flag for 17 common
-agents and pre-fills it, but every value is editable and nothing is hardcoded at runtime. A few
-agents (Goose) bypass via an environment variable instead of a flag; those are handled too, since an
-env var has to be set before the process starts rather than appended to the command line.
+The flag is **per agent** and fully configurable. The plugin knows the correct flag for 17 common agents and
+pre-fills it, but every value is editable and nothing is hardcoded at runtime. A few agents (Goose) bypass via an
+environment variable instead of a flag; those are handled too.
 
 **The toggle is off by default and never turns itself on.**
 
-A gear button on the right of the dropdown opens the plugin's settings directly.
+### Runs inside the panel (real terminal)
+
+**Selecting an agent in the dropdown launches it immediately** — there is no separate button. The agent opens in a
+**real, interactive terminal embedded directly inside the YOLO panel**: a genuine PTY (via JediTerm + PTY4J, the same
+terminal emulator the IDE itself bundles) that renders the agent's TUI in place. Prompts, editors, and your rc-defined
+`PATH` (nvm / fnm / npm global bin, …) all work because the agent runs through an interactive login shell.
+
+> This is built entirely on **public APIs**: JediTerm and PTY4J are third-party libraries shipped with the IntelliJ
+> Platform (not `@ApiStatus.Internal` / `@Experimental` Terminal APIs), so the plugin stays publishable on the
+> JetBrains Marketplace. The IDE's own `ConsoleView` is output-only (no interactive input), so a real agent can only
+> live in the panel by embedding a true terminal — which is exactly what this does.
 
 > ### Warning — about YOLO mode
 >
@@ -56,10 +61,9 @@ A gear button on the right of the dropdown opens the plugin's settings directly.
 | | |
 |---|---|
 | IDE | IntelliJ IDEA **2026.1** or later (`since-build 261`) |
-| Bundled plugin | Terminal (`org.jetbrains.plugins.terminal`) — enabled by default |
+| Dependencies | None beyond the IntelliJ Platform itself — the Terminal plugin is **not** required |
 
-The Terminal AI Agents dropdown was opened to third-party agents in 2026.1; on earlier versions the
-extension points this plugin relies on do not exist.
+---
 
 ## Build
 
@@ -78,28 +82,18 @@ SDK pinned in `gradle.properties`. To build against the IDE on your machine inst
 localIdeaPath=/Applications/IntelliJ IDEA.app
 ```
 
-This overrides the SDK with your local IDE, which is useful when matching a specific IDE version or
-testing against an internal API that differs from the pinned SDK.
-
 ## Installation
+
+**From the Marketplace** — search for **YOLO: AI Agents Extender** in *Settings | Plugins* and install.
 
 **From disk** — build or download the `yolo-<version>.zip` (see [Build](#build)), then
 `Settings | Plugins | ⚙ | Install Plugin from Disk…` and pick the zip. Restart when prompted.
-
-### Releases
-
-This plugin relies heavily on IntelliJ **Internal** APIs — the Terminal AI Agents extension points
-it hooks into are marked internal. Plugins that depend on internal API are rejected by JetBrains
-Marketplace verification, so **this plugin is not published to the Marketplace**.
-
-Get builds from the **Releases** page of this repository: download the `yolo-<version>.zip` and
-install it with *Install Plugin from Disk…* as described above.
 
 ---
 
 ## Configuration
 
-**`Settings | Tools | YOLO: AI Agents Extender`** — or click the gear in the Terminal toolbar.
+**`Settings | Tools | YOLO: AI Agents Extender`** — or click the gear in the YOLO panel header.
 
 ![yolo-settings.png](screenshots/yolo-settings.png)
 
@@ -107,22 +101,21 @@ Everything lives in one table. Each row is an agent, and each row carries its ow
 
 | Column | Meaning |
 |---|---|
-| Icon | IDEA's own icon for built-in agents; your file or a default bolt for custom tools. Greyed out when the command isn't on `PATH` |
+| Icon | The bundled icon for promoted agents; your file or a default bolt for custom tools. Greyed out when the command isn't on `PATH` |
 | ID | Unique identifier |
-| Display name | The name shown in the dropdown |
+| Display name | The name shown in the YOLO panel |
 | Command | Executable name — must resolve on `PATH` |
 | Base args | Arguments always passed, space separated |
 | Skip flag | The permission-bypass argument, appended when the YOLO toggle is on |
 | Icon file / URL | A local image or `http(s)` URL — custom tools only |
 
-Rows come in three kinds, listed in descending priority:
+Rows come in two kinds, listed in descending priority:
 
-1. **IDEA built-in agents** — read-only, cannot be removed, keep IDEA's icons
-2. **Agents this plugin knows about** (Gemini, Cline, CodeBuddy, …) — read-only, sorted by ID
-3. **Your own custom tools** — fully editable, in the order you created them
+1. **Promoted agents** (Claude Code, Codex, CodeBuddy, …) — read-only, sorted with **Claude Code** and
+   **Codex** pinned at the top, cannot be removed.
+2. **Your own custom tools** — fully editable, in the order you created them.
 
-Only the Skip flag is editable on the first two kinds. That's deliberate: the plugin should extend
-the dropdown, not take it over.
+Only the Skip flag is editable on promoted agents. That's deliberate: the plugin should extend the panel, not take it over.
 
 ### Conveniences
 
@@ -142,7 +135,6 @@ source of truth. What runs is whatever the settings say.
 
 | Agent | Command | Skip flag |
 |---|---|---|
-| Junie | `junie` | `--dangerously-skip-permissions` |
 | Claude Code | `claude` | `--dangerously-skip-permissions` |
 | Codex | `codex` | `--yolo` |
 | CodeBuddy | `codebuddy` | `-y` |
@@ -180,8 +172,8 @@ grep "AI Agents Extender" ~/.cache/JetBrains/IntelliJIdea<version>/log/idea.log
 grep "AI Agents Extender" "$env:LOCALAPPDATA\JetBrains\IntelliJIdea<version>\log\idea.log"
 ```
 
-**An agent is missing from the dropdown.** Its command isn't resolving on `PATH`. Check the Settings
-table — a greyed-out icon means not found. Note that the IDE inherits the `PATH` of whatever
+**An agent is missing from the panel.** Its command isn't resolving on `PATH`. Check the Settings
+table — a dimmed entry means not found. Note that the IDE inherits the `PATH` of whatever
 launched it, which may differ from your shell's.
 
 **The flag isn't being applied.** Confirm the YOLO toggle is on and the row has a Skip flag. The log

@@ -7,10 +7,9 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.options.ShowSettingsUtil
 
 /**
- * The gear button on the terminal title bar, right next to the AI Agents dropdown, opening this plugin's
- * settings page with one click.
+ * The gear button in the YOLO panel header, opening this plugin's settings page with one click.
  *
- * Installed by SkipToggleToolWindowInitializer via the toolWindowInitializer extension point.
+ * Added to the panel's toolbar by YoloToolWindowFactory.
  * Locate the settings page by the Configurable class rather than its display name: the display name changes
  * with the IDE language, the class does not.
  */

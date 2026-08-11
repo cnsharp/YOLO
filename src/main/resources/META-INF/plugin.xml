@@ -8,22 +8,21 @@
     <version>0.2.0</version>
     <vendor email="support@cnsharp.com" url="">CnSharp Studio</vendor>
     <description><![CDATA[
-<p><b>YOLO</b> extends IntelliJ IDEA's Terminal <b>AI Agents</b> dropdown with your own tools, and lets you launch them in <b>YOLO mode</b> with a single click.</p>
+<p><b>YOLO</b> is a standalone <b>AI Agents</b> panel for IntelliJ IDEA. It lists your AI CLIs (Claude Code, Codex, CodeBuddy, Qoder, or your own) and lets you launch any of them in <b>YOLO mode</b> with a single click — no Terminal plugin required.</p>
 <ul>
-  <li><b>AI Agents extension</b> — Add any AI CLI (Claude Code, Codex, CodeBuddy, Qoder, or your own) to the Terminal panel's AI Agents menu.</li>
-  <li><b>YOLO mode</b> — A "Skip permissions" toggle sits in the Terminal toolbar, left of the AI Agents dropdown. When on, the next agent launches with its skip-permissions flag (e.g. <code>--dangerously-skip-permissions</code>, <code>--yolo</code>, <code>-y</code>). Per-agent, fully configurable, and <b>off by default</b>.</li>
+  <li><b>YOLO panel</b> — A dedicated tool window (right side, <b>y</b> icon) that replicates the Terminal's AI Agents experience, built entirely on public IntelliJ APIs so it passes Marketplace verification.</li>
+  <li><b>YOLO mode</b> — A "Skip permissions" toggle in the panel. When on, the next agent launches with its skip-permissions flag (e.g. <code>--dangerously-skip-permissions</code>, <code>--yolo</code>, <code>-y</code>). Per-agent, fully configurable, and <b>off by default</b>.</li>
+  <li><b>In-IDE console</b> — Launching an agent opens it in a real PTY-backed console tab inside the YOLO panel, so the agent runs interactively without leaving the IDE.</li>
 </ul>
 
 <p><b>⚠️ Warning — about "YOLO mode" / the skip-permissions flag:</b> letting an AI agent run commands and edit files <b>without confirmation</b> can make irreversible changes, execute untrusted code, or expose your system. These risks come entirely from the agent and the bypass flag itself. <b>This plugin only flips that flag for you — it adds no such behavior of its own</b>, performs no actions on your behalf, and is not responsible for what the agent does. Enable YOLO mode only in trusted environments.</p>
 ]]></description>
 
-    <!-- Verified locally only from 2026.2 (build 262) for the terminal AI Agents extension points;
-         the user requested support starting from 2026.1 (build 261). until-build is left unlocked
+    <!-- Built and verified on IntelliJ IDEA 2026.1+ (build 261). until-build is left unlocked
          to avoid blocking subsequent minor versions. -->
     <idea-version since-build="261"/>
     <!-- Declares a platform module dependency to avoid the warning that this would be treated as a legacy plugin loadable only in IntelliJ IDEA -->
     <depends>com.intellij.modules.platform</depends>
-    <depends>org.jetbrains.plugins.terminal</depends>
 
     <!-- Default (English) resource bundle for all user-visible text; YoloBundle_zh.properties provides Chinese.
          The action's text/description is also resolved by the platform from here via action.<id>.text. -->
@@ -38,22 +37,11 @@
                       bundle="messages.YoloBundle"
                       id="com.cnsharp.yolo.configurable"/>
         <notificationGroup id="com.cnsharp.yolo.notifications" displayType="BALLOON"/>
-    </extensions>
-
-    <!-- Extension points used by the terminal AI Agents dropdown (all from org.jetbrains.plugins.terminal).
-         These terminal extension points (TerminalAgentProvider, ShellExecOptionsCustomizer,
-         TerminalToolWindowInitializer) are still @ApiStatus.Internal experimental APIs in 2026.2,
-         so IDEA warns about them. This plugin hard-depends on them with no public alternative, hence
-         the per-line suppression of that inspection. -->
-    <extensions defaultExtensionNs="org.jetbrains.plugins.terminal">
-        <!-- suppress PluginXmlApiIsInternal -->
-        <terminalAgentProvider implementation="com.cnsharp.yolo.terminal.CustomTerminalAgentProvider"/>
-        <!-- suppress PluginXmlApiIsInternal -->
-        <shellExecOptionsCustomizer implementation="com.cnsharp.yolo.terminal.TerminalSkipFlagCustomizer"/>
-        <!-- order=last: must run after the terminal's own Initializer, otherwise setTitleActions would be overwritten -->
-        <!-- suppress PluginXmlApiIsInternal -->
-        <toolWindowInitializer implementation="com.cnsharp.yolo.terminal.SkipToggleToolWindowInitializer"
-                               order="last"/>
+        <!-- The standalone YOLO panel: a public tool window anchored on the right, using the plugin's y icon. -->
+        <toolWindow id="YOLO"
+                    anchor="right"
+                    icon="/icons/agents/skipY.svg"
+                    factoryClass="com.cnsharp.yolo.panel.YoloToolWindowFactory"/>
     </extensions>
 
 

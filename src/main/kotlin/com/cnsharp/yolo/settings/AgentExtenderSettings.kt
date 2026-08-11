@@ -6,7 +6,6 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.util.xmlb.XmlSerializerUtil
-import org.jetbrains.plugins.terminal.agent.TerminalAgent
 
 /** "Skip permissions" rule for a single tool: only stores this agent's skip flag value;
  *  whether it is actually injected is decided by the toolbar's global "Skip permissions" checkbox (skipEnabled). */
@@ -64,20 +63,14 @@ object DefaultSkipEnvs {
     fun forId(id: String): Pair<String, String>? = map[id.lowercase()]
 }
 
-/** IDEA's built-in agents: dynamically taken from TerminalAgentProvider (excluding this plugin's own provider).
- *  When an IDEA upgrade adds a new built-in agent, this updates automatically — no need to hardcode a list. */
-object BuiltInAgents {
-    fun all(): List<TerminalAgent> =
-        TerminalAgent.getAllTerminalAgents()
-            .filter { !it.agentKey.key.startsWith("custom.", ignoreCase = true) }
-}
-
-/** Agents additionally promoted by this plugin but not built into IDEA (must be written to customTools to appear in the dropdown).
- *  Unlike BuiltInAgents: these are convenience entries offered proactively by the plugin, not natively supported by IDEA,
- *  so they still need hardcoding — we cannot "dynamically" learn about agents IDEA does not publish. */
+/** Agents promoted by this plugin (proactively offered, listed at the top of the panel/settings).
+ *  These are convenience entries offered by the plugin, not natively supported by IDEA, so they are
+ *  hardcoded. List order is the display order — Claude Code and Codex are pinned as the Top 2. */
 object PromotedAgents {
     data class Meta(val id: String, val displayName: String, val command: String)
     val entries: List<Meta> = listOf(
+        Meta("claude",    "Claude Code", "claude"),
+        Meta("codex",     "Codex",     "codex"),
         Meta("cline",     "Cline",    "cline"),
         Meta("codebuddy", "CodeBuddy", "codebuddy"),
         Meta("continue",  "Continue", "cn"),
@@ -125,20 +118,12 @@ class AgentExtenderSettings : PersistentStateComponent<AgentExtenderSettings.Sta
 
     /**
      * Sync currently-installed agents into the config; called once per startup.
-     *  - Built-in agents: if detected as installed, add a permission rule (do not write customTools).
-     *  - Promoted agents (e.g. codebuddy, not built into IDEA): if detected as installed, add a permission rule
-     *    AND add to customTools so it appears in the terminal dropdown.
+     *  - Promoted agents (e.g. claude/codex/codebuddy, not built into IDEA): if detected as installed, add a permission rule
+     *    AND add to customTools so it appears in the YOLO panel.
      *  All are "skip if present" — idempotent and never deletes existing entries, so running once per startup is safe.
      *  Note: spawns processes, so the caller must ensure this runs on a background thread.
      */
     fun syncInstalledAgents() {
-        for (agent in BuiltInAgents.all()) {
-            val id = agent.binaryName
-            if (!AgentDetector.canExecute(id)) continue
-            if (currentState.permissionRules.none { it.agentId == id }) {
-                currentState.permissionRules.add(PermissionRule(id, DefaultSkipFlags.forId(id)))
-            }
-        }
         for ((id, displayName, command) in PromotedAgents.entries) {
             if (!AgentDetector.canExecute(command)) continue
             if (currentState.permissionRules.none { it.agentId == command }) {

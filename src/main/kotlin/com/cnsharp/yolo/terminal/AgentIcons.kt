@@ -27,6 +27,8 @@ object AgentIcons {
 
     /** Official icons bundled with the plugin: agent id -> classpath resource path. */
     private val BUNDLED: Map<String, String> = mapOf(
+        "claude"    to "/icons/agents/claude.svg",
+        "codex"     to "/icons/agents/codex.svg",
         "codebuddy" to "/icons/agents/codebuddy.svg",
         "gemini"    to "/icons/agents/gemini.png",
         "copilot"   to "/icons/agents/copilot.svg",

@@ -71,11 +71,9 @@ dependencies {
         if (localIdeaPath != null) {
             local(file(localIdeaPath))
         } else {
-            // Use Ultimate to match the local dev environment (internal APIs like
-            // TerminalAgentProvider resolve here).
+            // Use Ultimate to match the local dev environment.
             create(IntelliJPlatformType.IntellijIdeaUltimate, "2026.2")
         }
-        bundledPlugin("org.jetbrains.plugins.terminal")
     }
 }
 
