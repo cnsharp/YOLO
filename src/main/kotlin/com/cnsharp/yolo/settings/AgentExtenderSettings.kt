@@ -149,6 +149,12 @@ class AgentExtenderSettings : PersistentStateComponent<AgentExtenderSettings.Sta
         // Each agent's skip flag value (from Settings); whether it is injected is controlled by skipEnabled.
         var permissionRules: MutableList<PermissionRule> = mutableListOf()
         var customTools: MutableList<CustomTool> = mutableListOf()
+        /**
+         * Cache of commands (lower-cased) detected as installed on the machine. Persisted so the dropdown
+         * loads instantly from this cache on the next open; a background re-scan refreshes it and only
+         * touches the dropdown when the detected set actually differs.
+         */
+        var installedCommands: MutableList<String> = mutableListOf()
     }
 
     companion object {

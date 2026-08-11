@@ -74,8 +74,7 @@ private data class AgentRow(
     val command: String,
     val baseArgs: String,
     val skipFlag: String,
-    val iconPath: String,
-    var installed: Boolean
+    val iconPath: String
 )
 
 /**
@@ -171,32 +170,41 @@ private class YoloPanel(
     /** Rebuild the agents dropdown from current settings. */
     private fun rebuild() {
         val rows = buildRows()
-        // Show the prompt immediately; installed agents are filled in once the probe below completes.
-        agentCombo.removeAllItems()
-        agentCombo.addItem(rows.first { it.command.isBlank() })
-        agentCombo.selectedIndex = 0
-        refreshInstalled(rows)
+        // Fast path: show the persisted installed set immediately (no PATH probes) so the dropdown is instant.
+        populateFromCache(rows)
+        // Slow path: re-scan installed agents in the background; only rebuild the dropdown if the set changed.
+        rescanInstalled(rows)
     }
 
-    /** Probe each command on a background thread, then show only installed agents in the dropdown. */
-    private fun refreshInstalled(rows: List<AgentRow>) {
-        val gen = refreshGeneration.incrementAndGet()
-        val app = ApplicationManager.getApplication()
-        app.executeOnPooledThread {
-            rows.forEach { if (it.command.isNotBlank()) it.installed = AgentDetector.canExecute(it.command) }
-            app.invokeLater {
-                // Ignore this callback if a newer rebuild has started in the meantime.
-                if (gen == refreshGeneration.get()) populateInstalled(rows)
-            }
-        }
-    }
-
-    /** Repopulate the dropdown with the prompt plus only the agents that resolved on PATH. */
-    private fun populateInstalled(rows: List<AgentRow>) {
-        val visible = rows.filter { it.command.isBlank() || it.installed }
+    /** Populate the dropdown from the persisted installed-agents cache (instant, no process probes). */
+    private fun populateFromCache(rows: List<AgentRow>) {
+        val installed = AgentExtenderSettings.getInstance().state.installedCommands.toSet()
+        val visible = rows.filter { it.command.isBlank() || installed.contains(it.command.lowercase()) }
         agentCombo.removeAllItems()
         visible.forEach { agentCombo.addItem(it) }
         if (agentCombo.itemCount > 0) agentCombo.selectedIndex = 0
+    }
+
+    /** Re-scan installed agents on a background thread; update the cache and the dropdown only if it differs. */
+    private fun rescanInstalled(rows: List<AgentRow>) {
+        val gen = refreshGeneration.incrementAndGet()
+        val app = ApplicationManager.getApplication()
+        app.executeOnPooledThread {
+            val detected = rows
+                .filter { it.command.isNotBlank() && AgentDetector.canExecute(it.command) }
+                .map { it.command.lowercase() }
+                .toSet()
+            app.invokeLater {
+                // Ignore this callback if a newer rebuild has started in the meantime.
+                if (gen != refreshGeneration.get()) return@invokeLater
+                val state = AgentExtenderSettings.getInstance().state
+                if (detected != state.installedCommands.toSet()) {
+                    state.installedCommands.clear()
+                    state.installedCommands.addAll(detected.sorted())
+                    populateFromCache(rows)
+                }
+            }
+        }
     }
 
     /** Build the full row set, deduplicated by command so a custom tool sharing a promoted agent's command is not listed twice. */
@@ -222,9 +230,9 @@ private class YoloPanel(
         // The "AI Agents" prompt is the default selection (shown as the dropdown title). It is not a
         // real agent, so it launches nothing — this also prevents the first real agent from auto-launching
         // when the panel opens and selectedIndex is set programmatically.
-        addUnique(AgentRow("", message("panel.agentsPrompt"), "", "", "", "", true))
+        addUnique(AgentRow("", message("panel.agentsPrompt"), "", "", "", ""))
         for (meta in PromotedAgents.entries) {
-            addUnique(AgentRow(meta.id, meta.displayName, meta.command, "", flagFor(meta.command, meta.id), "", false))
+            addUnique(AgentRow(meta.id, meta.displayName, meta.command, "", flagFor(meta.command, meta.id), ""))
         }
         for (tool in settings.customTools) {
             addUnique(
@@ -234,8 +242,7 @@ private class YoloPanel(
                     command = tool.command,
                     baseArgs = tool.baseArgs,
                     skipFlag = flagFor(tool.command, tool.id),
-                    iconPath = tool.iconPath,
-                    installed = false
+                    iconPath = tool.iconPath
                 )
             )
         }
