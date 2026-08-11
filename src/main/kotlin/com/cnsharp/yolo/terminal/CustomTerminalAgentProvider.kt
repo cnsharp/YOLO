@@ -7,11 +7,12 @@ import org.jetbrains.plugins.terminal.agent.TerminalAgentProvider
 import javax.swing.Icon
 
 /**
- * 把用户在 Settings 里配置的工具追加到终端 "AI Agents" 下拉列表。
+ * Append tools configured by the user in Settings to the terminal "AI Agents" dropdown.
  *
- * 这是终端下拉真正读取的扩展点（org.jetbrains.plugins.terminal.terminalAgentProvider）。
- * DefaultTerminalAgentProvider 以 order="first" 提供 Junie / Claude Code / Codex，
- * 本 provider 只做追加，不会替换内置项。
+ * This is the extension point the terminal dropdown actually reads
+ * (org.jetbrains.plugins.terminal.terminalAgentProvider).
+ * DefaultTerminalAgentProvider provides Junie / Claude Code / Codex at order="first";
+ * this provider only appends and never replaces the built-in entries.
  */
 class CustomTerminalAgentProvider : TerminalAgentProvider {
 
@@ -29,15 +30,15 @@ private class CustomTerminalAgent(private val tool: CustomTool) : TerminalAgent 
     override val displayName: String
         get() = tool.displayName.ifBlank { tool.id }
 
-    /** 终端会在 PATH 与已知位置里查找这个可执行文件；找不到就不会出现在下拉里。 */
+    /** The terminal looks up this executable in PATH and known locations; if not found it won't appear in the dropdown. */
     override val binaryName: String
         get() = tool.command
 
-    /** 用户指定图标 > 随包官方图标 > 通用图标。 */
+    /** User-specified icon > bundled official icon > generic icon. */
     override val icon: Icon
         get() = AgentIcons.forAgent(tool.id, tool.iconPath)
 
-    /** 与内置的 Claude Code 一致，在标签页上也显示图标。 */
+    /** Matches the built-in Claude Code: also show the icon in the tab. */
     override val showIconInTab: Boolean
         get() = true
 }

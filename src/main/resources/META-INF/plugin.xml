@@ -1,10 +1,11 @@
 <idea-plugin>
     <id>com.cnsharp.yolo</id>
-    <!-- <name> 由构建时注入：build.gradle.kts 从 messages/YoloBundle.properties 的
-         plugin.name 读取并覆写，产品名只在那一个 key 里维护。此处仅为占位。 -->
+    <!-- <name> is injected at build time: build.gradle.kts reads and overwrites it from
+         messages/YoloBundle.properties' plugin.name, so the product name is maintained only in
+         that single key. This is just a placeholder. -->
     <name>YOLO: AI Agents Extender</name>
-    <!-- <version> 同样由构建时注入：来自 gradle.properties 的 pluginVersion。此处仅为占位。 -->
-    <version>0.1.0</version>
+    <!-- <version> is also injected at build time: from pluginVersion in gradle.properties. This is just a placeholder. -->
+    <version>0.2.0</version>
     <vendor email="support@cnsharp.com" url="">CnSharp Studio</vendor>
     <description><![CDATA[
 <p><b>YOLO</b> extends IntelliJ IDEA's Terminal <b>AI Agents</b> dropdown with your own tools, and lets you launch them in <b>YOLO mode</b> with a single click.</p>
@@ -16,20 +17,21 @@
 <p><b>⚠️ Warning — about "YOLO mode" / the skip-permissions flag:</b> letting an AI agent run commands and edit files <b>without confirmation</b> can make irreversible changes, execute untrusted code, or expose your system. These risks come entirely from the agent and the bypass flag itself. <b>This plugin only flips that flag for you — it adds no such behavior of its own</b>, performs no actions on your behalf, and is not responsible for what the agent does. Enable YOLO mode only in trusted environments.</p>
 ]]></description>
 
-    <!-- 仅在本机实测过的 2026.2 (build 262) 起支持终端 AI Agents 这套扩展点；
-         用户要求从 2026.1 (build 261) 起支持。until-build 不锁，避免挡住后续小版本。 -->
+    <!-- Verified locally only from 2026.2 (build 262) for the terminal AI Agents extension points;
+         the user requested support starting from 2026.1 (build 261). until-build is left unlocked
+         to avoid blocking subsequent minor versions. -->
     <idea-version since-build="261"/>
-    <!-- 声明平台模块依赖，避免被当作 legacy plugin 仅能在 IntelliJ IDEA 加载的警告 -->
+    <!-- Declares a platform module dependency to avoid the warning that this would be treated as a legacy plugin loadable only in IntelliJ IDEA -->
     <depends>com.intellij.modules.platform</depends>
     <depends>org.jetbrains.plugins.terminal</depends>
 
-    <!-- 所有用户可见文案的默认（英文）资源包；YoloBundle_zh.properties 提供中文。
-         action 的 text/description 也由平台从这里按 action.<id>.text 解析。 -->
+    <!-- Default (English) resource bundle for all user-visible text; YoloBundle_zh.properties provides Chinese.
+         The action's text/description is also resolved by the platform from here via action.<id>.text. -->
     <resource-bundle>messages.YoloBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
         <applicationService serviceImplementation="com.cnsharp.yolo.settings.AgentExtenderSettings"/>
-        <!-- 不写 displayName：key 指向 YoloBundle 的 plugin.name，产品名只维护那一处 -->
+        <!-- displayName is omitted: key points to YoloBundle's plugin.name, so the product name is maintained only in that one place -->
         <applicationConfigurable instance="com.cnsharp.yolo.settings.AgentExtenderConfigurable"
                       groupId="tools"
                       key="plugin.name"
@@ -38,16 +40,17 @@
         <notificationGroup id="com.cnsharp.yolo.notifications" displayType="BALLOON"/>
     </extensions>
 
-    <!-- 终端 AI Agents 下拉使用的扩展点（全部来自 org.jetbrains.plugins.terminal）。
-         这些 terminal 扩展点（TerminalAgentProvider、ShellExecOptionsCustomizer、
-         TerminalToolWindowInitializer）在 2026.2 仍是 @ApiStatus.Internal 的实验性 API，
-         IDEA 会对此报警；本插件功能强依赖它们，无公开替代，故逐行抑制该检查。 -->
+    <!-- Extension points used by the terminal AI Agents dropdown (all from org.jetbrains.plugins.terminal).
+         These terminal extension points (TerminalAgentProvider, ShellExecOptionsCustomizer,
+         TerminalToolWindowInitializer) are still @ApiStatus.Internal experimental APIs in 2026.2,
+         so IDEA warns about them. This plugin hard-depends on them with no public alternative, hence
+         the per-line suppression of that inspection. -->
     <extensions defaultExtensionNs="org.jetbrains.plugins.terminal">
         <!-- suppress PluginXmlApiIsInternal -->
         <terminalAgentProvider implementation="com.cnsharp.yolo.terminal.CustomTerminalAgentProvider"/>
         <!-- suppress PluginXmlApiIsInternal -->
         <shellExecOptionsCustomizer implementation="com.cnsharp.yolo.terminal.TerminalSkipFlagCustomizer"/>
-        <!-- order=last：必须在终端自己的 Initializer 之后跑，否则 setTitleActions 会被覆盖 -->
+        <!-- order=last: must run after the terminal's own Initializer, otherwise setTitleActions would be overwritten -->
         <!-- suppress PluginXmlApiIsInternal -->
         <toolWindowInitializer implementation="com.cnsharp.yolo.terminal.SkipToggleToolWindowInitializer"
                                order="last"/>
@@ -55,8 +58,8 @@
 
 
     <actions>
-        <!-- text/description 省略：由上面的 <resource-bundle> 按
-             action.com.cnsharp.yolo.SkipPermissionsAction.text/.description 解析 -->
+        <!-- text/description omitted: resolved by the <resource-bundle> above via
+             action.com.cnsharp.yolo.SkipPermissionsAction.text/.description -->
         <action id="com.cnsharp.yolo.SkipPermissionsAction"
                 class="com.cnsharp.yolo.launcher.SkipPermissionsAction"/>
         <action id="com.cnsharp.yolo.OpenSettingsAction"

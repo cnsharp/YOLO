@@ -38,12 +38,14 @@ import javax.swing.table.TableCellRenderer
 /**
  * Settings | Tools | YOLO: AI Agents Extender
  *
- * 单一的 agent 合并列表，每行都可配置自己的 “Skip flag”（跳过权限参数）：
- *   - IDEA 内置 agent（动态取自 TerminalAgentProvider，只读、不可移除、图标用 IDEA 自带）
- *   - 本插件推广 agent（如 codebuddy，只读、不可移除）
- *   - 用户自定义工具（可编辑、可增删、图标可指定）
- * “Skip flag” 列的值：勾选终端工具栏 “Skip permissions” 时，会被注入到该 agent 的启动命令之后。
- * 已安装（在 PATH 上）的 agent 图标正常点亮，未安装的图标显示为灰色；有图标显示图标，没有则默认闪电。
+ * A single merged agent list, where each row can configure its own "Skip flag" (permission-skip argument):
+ *   - IDEA built-in agents (dynamically taken from TerminalAgentProvider; read-only, cannot be removed, icon from IDEA)
+ *   - Agents promoted by this plugin (e.g. codebuddy; read-only, cannot be removed)
+ *   - User custom tools (editable, addable/removable, icon specifiable)
+ * The value of the "Skip flag" column is injected after the agent's launch command when the terminal toolbar's
+ * "Skip permissions" is checked.
+ * Installed agents (on PATH) show their icon lit; uninstalled agents show a greyed icon. If an icon exists it is
+ * shown, otherwise a default lightning bolt is used.
  */
 class AgentExtenderConfigurable : Configurable {
 
@@ -58,21 +60,21 @@ class AgentExtenderConfigurable : Configurable {
 
     private val toolsTable = AgentsTable(toolsModel)
 
-    /** 内置 agent 的 id（小写）集合与 id->图标 映射，reset() 时刷新，供判读/渲染使用。 */
+    /** Lowercased id set of built-in agents and id->icon map, refreshed on reset(); used for judging/rendering. */
     private var builtInIds: Set<String> = emptySet()
     private var builtInIconById: Map<String, Icon?> = emptyMap()
-    /** 本插件推广 agent（如 codebuddy）的 id（小写）集合：与内置一样只读、不可移除、不可改图标。 */
+    /** Lowercased id set of agents promoted by this plugin (e.g. codebuddy): like built-ins, read-only, not removable, icon fixed. */
     private var promotedIds: Set<String> = emptySet()
 
     private val statusLabel = JLabel("")
 
     private var panel: JComponent? = null
 
-    /** 是否有未保存的改动：驱动平台 Apply 按钮的可用/置灰状态。 */
+    /** Whether there are unsaved changes: drives the platform Apply button's enabled/disabled state. */
     private var modified = false
-    /** reset() 重建表格时临时抑制 TableModelListener，避免把“加载”误判为“改动”。 */
+    /** Temporarily suppress TableModelListener while reset() rebuilds the table, to avoid mistaking "loading" for "changes". */
     private var rebuilding = false
-    /** autoFillSkipFlag 里 setValueAt 会再次触发 TableModelListener，用此标志防止递归处理。 */
+    /** setValueAt inside autoFillSkipFlag retriggers TableModelListener; this flag prevents recursive handling. */
     private var autoFilling = false
 
     override fun getDisplayName(): String = Yolo.NAME
@@ -84,8 +86,8 @@ class AgentExtenderConfigurable : Configurable {
         toolsTable.columnModel.getColumn(COL_ICON).preferredWidth = 48
         toolsTable.columnModel.getColumn(COL_SKIP).preferredWidth = 200
 
-        // 任意单元格改动（增删行、编辑、改图标）都标记为“有未保存改动”，使 Apply 按钮点亮；
-        // 同时即时做重复检查，让用户在编辑当下就看到冲突，而不是等到 Apply 才发现。
+        // Any cell change (add/remove row, edit, change icon) is marked as "unsaved changes", lighting the Apply button;
+        // duplicate checks also run immediately so the user sees conflicts while editing, not only at Apply time.
         installListeners()
 
         val titleWithHelp = JPanel(HorizontalLayout(4)).apply {
@@ -109,17 +111,17 @@ class AgentExtenderConfigurable : Configurable {
         return panel!!
     }
 
-    // ── 锁定判定 ─────────────────────────────────────────────────
+    // ── Locked detection ─────────────────────────────────────────────
 
-    /** 选中行是否为「锁定」agent：IDEA 内置 或 本插件推广（如 codebuddy）。
-     *  这两类对用户而言等同于内置——只读、不可移除、不可改图标。 */
+    /** Whether the selected row is a "locked" agent: IDEA built-in or promoted by this plugin (e.g. codebuddy).
+     *  To the user these two are equivalent to built-in — read-only, cannot be removed, icon cannot be changed. */
     private fun isLockedAgent(row: Int): Boolean {
         if (row < 0) return false
         val id = (toolsModel.getValueAt(row, COL_ID) as? String)?.trim()?.lowercase() ?: ""
         return id in builtInIds || id in promotedIds
     }
 
-    // ── 按钮 ───────────────────────────────────────────────────────
+    // ── Buttons ──────────────────────────────────────────────────────
 
     private fun addToolButton(): JComponent {
         val button = JButton(message("button.add"))
@@ -209,7 +211,7 @@ class AgentExtenderConfigurable : Configurable {
         toolsModel.setValueAt(path, row, COL_ICON_PATH)
     }
 
-    /** 校验选中行（无选中则全表）：命令能否在 PATH 解析 + 图标（URL 则下载）能否就位。 */
+    /** Validate the selected row (or the whole table if none selected): whether the command resolves on PATH + whether the icon (downloaded if a URL) is in place. */
     private fun validateButton(): JComponent {
         val button = JButton(message("button.validate"))
         button.toolTipText = message("button.validate.tooltip")
@@ -236,7 +238,7 @@ class AgentExtenderConfigurable : Configurable {
                 val results = entries.map { e ->
                     val cmd = CommandValidator.validate(e.command)
                     val icon = IconResolver.resolve(e.icon, e.id)
-                    // 归档后路径会变成 <id>.svg/png，回填到表格里让用户看到最终位置
+                    // After archiving the path becomes <id>.svg/png; write it back to the table so the user sees the final location
                     val archived = (icon as? IconResolver.Result.Local)
                         ?.path?.takeIf { it.isNotEmpty() && it != e.icon }
                     e to Triple(cmd, icon, archived)
@@ -286,14 +288,15 @@ class AgentExtenderConfigurable : Configurable {
         statusLabel.foreground = if (warn) JBColor.RED else JBColor.GREEN
     }
 
-    // ── 重复检查 ───────────────────────────────────────────────────
+    // ── Duplicate check ──────────────────────────────────────────────
 
     /**
-     * 找出重复的 ID / Command。
+     * Find duplicate ID / Command.
      *
-     * ID 直接按小写比；Command 按 [baseName] 后再比 —— 因为注入是按可执行文件名匹配的，
-     * `/usr/local/bin/claude` 和 `claude.cmd` 实际会指向同一个 agent，属于真重复。
-     * 空值不参与比较（新加的空行还没填完，不该立刻报错）。
+     * IDs are compared directly by lowercase; Commands are compared after [baseName] — because injection matches
+     * by executable filename, `/usr/local/bin/claude` and `claude.cmd` actually point to the same agent and are a
+     * genuine duplicate.
+     * Empty values are not compared (a newly added blank row is not yet filled in and should not error immediately).
      */
     private fun findDuplicates(): List<String> {
         val ids = HashMap<String, Int>()
@@ -312,7 +315,7 @@ class AgentExtenderConfigurable : Configurable {
         return problems
     }
 
-    /** 编辑过程中即时提示重复；无重复时清掉之前的重复告警。 */
+    /** Prompt duplicates immediately during editing; clear the previous duplicate warning when there are none. */
     private fun reportDuplicates() {
         val problems = findDuplicates()
         if (problems.isNotEmpty()) {
@@ -322,26 +325,28 @@ class AgentExtenderConfigurable : Configurable {
         }
     }
 
-    /** 注册表格变更监听：标记“有改动”、实时查重、并按已知 agent 自动预填 Skip flag。
-     *  单独抽出便于在无 UI 的测试环境里直接调用（createComponent 里的 ContextHelpLabel
-     *  依赖 IDEA 的 CoroutineScope 服务，MockApplication 不提供）。 */
+    /** Register table-change listener: mark "modified", check duplicates live, and auto-prefill the Skip flag for known agents.
+     *  Extracted separately so it can be called directly in headless test environments (the ContextHelpLabel inside
+     *  createComponent depends on IDEA's CoroutineScope service, which MockApplication does not provide). */
     private fun installListeners() {
         toolsModel.addTableModelListener { e ->
             if (rebuilding || autoFilling) return@addTableModelListener
             modified = true
             reportDuplicates()
-            // 用户新增/编辑某行的 ID 或 Command 时，若该工具是已知 agent 且其 Skip flag 列还空着，
-            // 用 DefaultSkipFlags 预填一个默认值——这样新加的 agent 不用手动抄写就“配好了 skip flag”。
-            // env 型 agent（goose）不走这里，它的绕过由 TerminalSkipFlagCustomizer 里的 DefaultSkipEnvs 注入环境变量。
+            // When the user adds/edits a row's ID or Command, if the tool is a known agent and its Skip flag column is
+            // still empty, prefill a default from DefaultSkipFlags — so a newly added agent gets its skip flag configured
+            // without manual copying.
+            // Env-type agents (goose) do not go here; their bypass is injected as an env var by DefaultSkipEnvs inside
+            // TerminalSkipFlagCustomizer.
             if (e.type == TableModelEvent.UPDATE && (e.column == COL_ID || e.column == COL_COMMAND)) {
                 autoFillSkipFlag(e.firstRow)
             }
         }
     }
 
-    /** 用户新增/编辑某行 ID 或 Command 时，若该工具是已知 agent 且 Skip flag 列还空着，
-     *  用 DefaultSkipFlags 预填默认值（按命令二进制名优先，回退到 ID）。
-     *  只对“列仍为空”的情况填充，用户手动清空或改写的不会被覆盖。 */
+    /** When the user adds/edits a row's ID or Command, if the tool is a known agent and its Skip flag column is still
+     *  empty, prefill a default from DefaultSkipFlags (prefer by command binary name, fall back to ID).
+     *  Only fills when the column is still empty; values the user manually cleared or changed are not overwritten. */
     private fun autoFillSkipFlag(row: Int) {
         if (row < 0 || row >= toolsModel.rowCount) return
         val id = (toolsModel.getValueAt(row, COL_ID) as? String)?.trim() ?: ""
@@ -360,16 +365,16 @@ class AgentExtenderConfigurable : Configurable {
         }
     }
 
-    // ── 安装状态（图标点亮 / 变灰） ────────────────────────────────
+    // ── Install status (icon lit / greyed) ──────────────────────────
 
-    /** 后台探测每行 Command 是否在 PATH 上，得到“已安装”标记，驱动图标点亮 / 变灰。 */
+    /** Probe in the background whether each row's Command can actually be executed, yielding an "installed" flag that drives icon lit/greyed. */
     private fun refreshInstalledFlags() {
         val app = ApplicationManager.getApplication()
         val n = toolsModel.rowCount
         app.executeOnPooledThread {
             val flags = BooleanArray(n) { i ->
                 val cmd = (toolsModel.getValueAt(i, COL_COMMAND) as? String)?.trim() ?: ""
-                cmd.isNotEmpty() && AgentDetector.isOnPath(cmd)
+                cmd.isNotEmpty() && AgentDetector.canExecute(cmd)
             }
             app.invokeLater {
                 toolsTable.setInstalled(flags)
@@ -377,12 +382,12 @@ class AgentExtenderConfigurable : Configurable {
         }
     }
 
-    // ── 持久化 ─────────────────────────────────────────────────────
+    // ── Persistence ──────────────────────────────────────────────────
 
     override fun isModified(): Boolean = modified
 
     override fun apply() {
-        // 重复的 ID/Command 会让下拉出现两条同名项、且 skip 规则互相覆盖，直接拒绝保存
+        // Duplicate ID/Command would create two same-named entries in the dropdown and skip rules would overwrite each other, so reject saving outright
         findDuplicates().takeIf { it.isNotEmpty() }?.let {
             val text = it.joinToString("; ")
             setStatus(text, warn = true)
@@ -391,7 +396,7 @@ class AgentExtenderConfigurable : Configurable {
 
         val settings = AgentExtenderSettings.getInstance()
 
-        // ① 权限规则：来自每一行的 Skip flag（按命令的二进制名匹配，customizer 才能命中）
+        // ① Permission rules: from each row's Skip flag (matched by command binary name so the customizer can hit it)
         val newRules = mutableListOf<PermissionRule>()
         for (r in 0 until toolsModel.rowCount) {
             val command = (toolsModel.getValueAt(r, COL_COMMAND) as? String)?.trim() ?: ""
@@ -402,7 +407,7 @@ class AgentExtenderConfigurable : Configurable {
         }
         settings.state.permissionRules = newRules
 
-        // ② 自定义工具：跳过内置/推广（它们不写 customTools），只保存用户自定义工具
+        // ② Custom tools: skip built-in/promoted (they are not written to customTools); only save user custom tools
         val builtInCmds = BuiltInAgents.all().map { it.binaryName.lowercase() }.toSet()
         settings.state.customTools = (0 until toolsModel.rowCount).mapNotNull { r ->
             val id = (toolsModel.getValueAt(r, COL_ID) as? String)?.trim() ?: ""
@@ -434,7 +439,7 @@ class AgentExtenderConfigurable : Configurable {
         for (tool in settings.state.customTools) {
             val icon = tool.iconPath.trim()
             if (icon.isEmpty()) continue
-            // URL 与本地文件都要归档成 <id>.svg/png；已归档的会被 IconResolver 原样返回
+            // Both URLs and local files are archived to <id>.svg/png; already-archived ones are returned as-is by IconResolver
             when (val r = IconResolver.resolve(icon, tool.id)) {
                 is IconResolver.Result.Local ->
                     if (r.path.isNotEmpty() && r.path != icon) { tool.iconPath = r.path; changed = true }
@@ -465,14 +470,14 @@ class AgentExtenderConfigurable : Configurable {
     }
 
     override fun reset() {
-        // 重建表格期间抑制 TableModelListener，避免把“加载”误判为“改动”
+        // Suppress TableModelListener while rebuilding the table, to avoid mistaking "loading" for "changes"
         rebuilding = true
         try {
             toolsModel.rowCount = 0
             val state = AgentExtenderSettings.getInstance().state
-            // 已有权限规则按"命令二进制名"建索引，回填到每行的 Skip flag 列
+            // Index existing permission rules by "command binary name" and write back to each row's Skip flag column
             val ruleByCmd = state.permissionRules.associateBy({ baseName(it.agentId).lowercase() }, { it.flag })
-            /** 优先用用户保存的规则；空则回退到 DefaultSkipFlags（按命令名再按 id）。 */
+            /** Prefer the user-saved rule; fall back to DefaultSkipFlags (by command name, then by id) if empty. */
             fun flagFor(cmd: String, id: String = ""): String {
                 val saved = ruleByCmd[baseName(cmd).lowercase()]
                 if (!saved.isNullOrBlank()) return saved
@@ -481,13 +486,13 @@ class AgentExtenderConfigurable : Configurable {
                 }
             }
 
-            // ① IDEA 内置（动态）
+            // ① IDEA built-in (dynamic)
             val builtIns: List<TerminalAgent> = BuiltInAgents.all()
             builtInIds = builtIns.map { it.agentKey.key.lowercase() }.toSet()
             builtInIconById = builtIns.associate { it.agentKey.key.lowercase() to it.icon }
             val builtInCmds = builtIns.map { it.binaryName.lowercase() }.toSet()
             promotedIds = PromotedAgents.entries.map { it.id.lowercase() }.toSet()
-            // IDEA 内置（动态）：逐行加入表格（保持 IDEA 给出的原生顺序，优先级最高）
+            // IDEA built-in (dynamic): add row by row (keep IDEA's native order, highest priority)
             for (agent in builtIns) {
                 val id = agent.agentKey.key
                 toolsModel.addRow(
@@ -497,7 +502,7 @@ class AgentExtenderConfigurable : Configurable {
                     )
                 )
             }
-            // ② 本插件推广（如 codebuddy）：按 ID 首字母排序，优先级低于内置、高于用户自定义
+            // ② Promoted by this plugin (e.g. codebuddy): sorted by id first letter; priority below built-in, above user custom
             for (meta in PromotedAgents.entries.sortedBy { it.id.lowercase() }) {
                 toolsModel.addRow(
                     arrayOf<Any>(
@@ -506,9 +511,9 @@ class AgentExtenderConfigurable : Configurable {
                     )
                 )
             }
-            // ③ 用户自定义工具（跳过与内置/推广重复的 id 或 同命令的旧遗留条目）。
-            //    按创建时间排序——用户每次新增都追加到列表末尾，没有行重排 UI，故保存顺序即创建顺序，
-            //    直接按 state.customTools 的先后加入即可（优先级最低）。
+            // ③ User custom tools (skip entries whose id duplicates built-in/promoted, or that share a command with legacy entries).
+            //    Sorted by creation time — each user addition appends to the list end, there is no row-reorder UI, so saved
+            //    order equals creation order; just add in state.customTools order (lowest priority).
             for (tool in state.customTools) {
                 val lid = tool.id.lowercase()
                 val cmd = tool.command.lowercase()
@@ -529,10 +534,10 @@ class AgentExtenderConfigurable : Configurable {
         }
     }
 
-    // ── 渲染器 ─────────────────────────────────────────────────────
+    // ── Renderers ───────────────────────────────────────────────────
 
-    /** 图标列：内置 agent 用 IDEA 自带图标；自定义工具用 AgentIcons（无则默认闪电）。
-     *  未安装（installedFlags 为 false）时把图标渲染成灰色，已安装则正常点亮。 */
+    /** Icon column: built-in agents use IDEA's own icon; custom tools use AgentIcons (default lightning bolt if none).
+     *  When not installed (installedFlags is false) render the icon greyed; when installed render it normally lit. */
     private inner class IconRenderer : TableCellRenderer {
         private val label = JLabel()
         override fun getTableCellRendererComponent(
@@ -560,7 +565,7 @@ class AgentExtenderConfigurable : Configurable {
         }
     }
 
-    /** 把图标画到 BufferedImage 上，用 GrayFilter 生成禁用（灰色）版本。 */
+    /** Draw the icon onto a BufferedImage and use GrayFilter to generate a disabled (greyed) version. */
     private fun greyed(icon: Icon): Icon {
         if (icon.iconWidth <= 0 || icon.iconHeight <= 0) return icon
         val img = BufferedImage(icon.iconWidth, icon.iconHeight, BufferedImage.TYPE_INT_ARGB)
@@ -570,7 +575,7 @@ class AgentExtenderConfigurable : Configurable {
         return ImageIcon(GrayFilter.createDisabledImage(img))
     }
 
-    /** 合并列表表格：锁定 agent 的 ID/Command 只读；未安装的行整行变灰（不点亮）。 */
+    /** Merged-list table: locked agents' ID/Command are read-only; rows that are not installed are greyed out (not lit) entirely. */
     private inner class AgentsTable(model: javax.swing.table.TableModel) : JBTable(model) {
         var installedFlags: BooleanArray = BooleanArray(0)
 
@@ -583,7 +588,7 @@ class AgentExtenderConfigurable : Configurable {
             if (column == COL_ICON) return false
             if (column == COL_ID || column == COL_COMMAND) {
                 val id = (model.getValueAt(row, COL_ID) as? String)?.trim()?.lowercase() ?: ""
-                // 内置 / 推广 agent 的 ID / Command 固定，不可编辑
+                // Built-in / promoted agents' ID / Command are fixed and not editable
                 if (id in builtInIds || id in promotedIds) return false
             }
             return super.isCellEditable(row, column)

@@ -17,20 +17,21 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /**
- * 解析自定义工具图标的输入：
- *  - 空字符串 → 不指定图标（交给上层回退到随包/默认图标）
- *  - http(s) URL → 下载
- *  - 其它 → 当作本地文件绝对路径
+ * Resolve the input for a custom tool's icon:
+ *  - Empty string → no icon specified (handed up to fall back to bundled/default icon)
+ *  - http(s) URL → download
+ *  - Anything else → treated as a local file absolute path
  *
- * 无论来源如何，最终都会归档到插件图标目录，并按 agent id 命名为 `<id>.svg` / `<id>.png`，
- * 与随包图标的命名规则保持一致。这样即使用户原始文件被移动或删除，图标依然可用。
+ * Regardless of source, the result is archived into the plugin's icon directory and named `<id>.svg` / `<id>.png`
+ * by agent id, matching the naming rule of bundled icons. This way the icon stays usable even if the user's
+ * original file is moved or deleted.
  *
- * 同名文件已存在且内容不同时，旧文件会按其创建时间重命名为 `<id>_<yyyyMMdd-HHmmss>.<ext>` 备份，
- * 不会被直接覆盖丢失。
+ * When a same-named file already exists but its content differs, the old file is renamed by its creation time to
+ * `<id>_<yyyyMMdd-HHmmss>.<ext>` as a backup, and is not overwritten and lost.
  *
- * 归档目录用 [PathManager.getConfigPath]，在 Windows 映射到
- * `%APPDATA%\JetBrains\<IDE>`，macOS 映射到 `~/Library/Application Support/...`，
- * Linux 映射到 `~/.config/...`，天然跨平台且落在用户数据（AppData）下。
+ * The archive directory uses [PathManager.getConfigPath], which on Windows maps to
+ * `%APPDATA%\JetBrains\<IDE>`, on macOS to `~/Library/Application Support/...`,
+ * and on Linux to `~/.config/...`, naturally cross-platform and under user data (AppData).
  */
 object IconResolver {
 
@@ -39,14 +40,14 @@ object IconResolver {
     private val BACKUP_STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
 
     sealed interface Result {
-        /** 可直接用于加载的本地图标路径（空串表示未指定图标）。 */
+        /** Local icon path that can be loaded directly (empty string means no icon specified). */
         data class Local(val path: String) : Result
         data class Error(val message: String) : Result
     }
 
     /**
-     * @param input   用户填写的图标来源：http(s) URL、本地绝对路径，或空串
-     * @param agentId 用于命名归档文件；留空则退回按来源哈希命名
+     * @param input   The icon source entered by the user: http(s) URL, local absolute path, or empty string
+     * @param agentId Used to name the archived file; if blank, falls back to hashing the source
      */
     fun resolve(input: String, agentId: String = ""): Result {
         val raw = input.trim()
@@ -60,7 +61,7 @@ object IconResolver {
         } else {
             val file = File(raw)
             if (!file.isFile) return Result.Error(message("error.icon.notExist", raw))
-            // 已经是归档目录里的文件（上一次 apply 的产物）：原样复用，避免每次保存都重复备份
+            // Already a file in the archive directory (a product of a previous apply): reuse as-is, to avoid re-backing-up on every save
             if (isArchived(file)) return Result.Local(file.absolutePath)
             try {
                 file.readBytes()
@@ -75,7 +76,7 @@ object IconResolver {
         return archive(bytes, ext, agentId, raw)
     }
 
-    /** 把图标内容落到 `<ICON_DIR>/<id>.<ext>`，必要时先备份同名旧文件。 */
+    /** Write the icon content to `<ICON_DIR>/<id>.<ext>`, backing up any same-named old file first if needed. */
     private fun archive(bytes: ByteArray, ext: String, agentId: String, source: String): Result {
         val dir = ICON_DIR.toFile()
         if (!dir.isDirectory && !dir.mkdirs()) {
@@ -85,7 +86,7 @@ object IconResolver {
         val base = sanitize(agentId).ifBlank { source.hashCode().toString(36) }
         val target = File(dir, "$base.$ext")
 
-        // 内容完全相同则无需改动，也不产生多余备份
+        // If the content is exactly the same, no change is needed and no extra backup is produced
         if (target.isFile && target.readBytes().contentEquals(bytes)) {
             return Result.Local(target.absolutePath)
         }
@@ -97,7 +98,7 @@ object IconResolver {
                 tmp.delete()
                 return Result.Error(message("error.icon.invalid", source))
             }
-            // 校验通过后才动旧文件，避免坏图标把好图标顶掉
+            // Only touch the old file after validation passes, to avoid a bad icon replacing a good one
             if (target.isFile) backup(target, base, ext)
             if (!tmp.renameTo(target)) {
                 target.delete()
@@ -113,7 +114,7 @@ object IconResolver {
         }
     }
 
-    /** 用创建时间给旧图标加后缀备份；同一秒内重复覆盖时再追加序号，避免互相顶掉。 */
+    /** Back up the old icon with a creation-time suffix; append an index if overwritten again within the same second, to avoid clobbering each other. */
     private fun backup(target: File, base: String, ext: String) {
         val stamp = LocalDateTime.ofInstant(creationTime(target), ZoneId.systemDefault()).format(BACKUP_STAMP)
         var dest = File(target.parentFile, "${base}_$stamp.$ext")
@@ -123,12 +124,12 @@ object IconResolver {
             n++
         }
         if (!target.renameTo(dest)) {
-            // 备份失败不阻断主流程：图标本身还能正常更新
+            // Backup failure does not block the main flow: the icon itself can still update normally
             runCatching { target.copyTo(dest, overwrite = false) }
         }
     }
 
-    /** 取文件创建时间；平台不支持时回退到最后修改时间。 */
+    /** Get the file's creation time; fall back to last-modified time when the platform does not support it. */
     private fun creationTime(file: File): java.time.Instant = try {
         val attrs = Files.readAttributes(file.toPath(), BasicFileAttributes::class.java)
         val created = attrs.creationTime().toInstant()
@@ -140,23 +141,23 @@ object IconResolver {
     private fun isArchived(file: File): Boolean =
         runCatching { file.canonicalFile.parentFile == ICON_DIR.toFile().canonicalFile }.getOrDefault(false)
 
-    /** 文件名只保留安全字符，避免 id 里的空格/斜杠等破坏路径。 */
+    /** Only keep safe characters in the filename, to avoid spaces/slashes in the id breaking the path. */
     private fun sanitize(id: String): String =
         id.trim().lowercase().replace(Regex("[^a-z0-9._-]"), "_").trim('.', '_')
 
     /**
-     * 只按内容嗅探判断类型，只接受 svg / png。
+     * Sniff the type purely by content; only accept svg / png.
      *
-     * 刻意不回退到扩展名：IconLoader.findIcon 是惰性的，不会真正解码内容，
-     * 所以一个内容是文本、后缀却是 .png 的文件能骗过校验被存进来，
-     * 直到渲染时才失败。按内容判断可以在入口就挡掉。
+     * Deliberately do not fall back to the extension: IconLoader.findIcon is lazy and does not actually decode
+     * content, so a file whose content is text but whose suffix is .png can fool the check and get stored,
+     * only failing at render time. Judging by content blocks it at the entry point.
      */
     private fun detectExtension(bytes: ByteArray): String? {
         if (bytes.size >= 8) {
             val png = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
             if (bytes.copyOfRange(0, 8).contentEquals(png)) return "png"
         }
-        // 允许 <svg> 前存在 XML 声明、DOCTYPE 或注释
+        // Allow an XML declaration, DOCTYPE, or comment before <svg>
         val head = String(bytes, 0, minOf(bytes.size, 1024), Charsets.UTF_8)
         if (head.contains("<svg", ignoreCase = true)) return "svg"
         return null
@@ -191,10 +192,10 @@ object IconResolver {
     }
 
     /**
-     * 校验图标真的能用。
+     * Verify the icon really works.
      *
-     * IconLoader.findIcon 只做惰性包装、不解码内容，损坏的图片也会返回非 null，
-     * 所以 PNG 额外用 ImageIO 真正解一次码，确保不是截断/损坏的文件。
+     * IconLoader.findIcon only does lazy wrapping and does not decode content, so a corrupted image still returns
+     * non-null; therefore PNG is additionally really decoded once via ImageIO to ensure it is not a truncated/corrupted file.
      */
     private fun isValidIcon(file: File, ext: String): Boolean = try {
         val loadable = IconLoader.findIcon(file.toURI().toURL()) != null

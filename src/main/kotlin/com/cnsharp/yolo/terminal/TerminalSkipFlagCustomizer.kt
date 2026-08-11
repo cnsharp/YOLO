@@ -10,16 +10,16 @@ import org.jetbrains.plugins.terminal.startup.ShellExecCommandImpl
 import org.jetbrains.plugins.terminal.startup.ShellExecOptionsCustomizer
 
 /**
- * 真正生效的注入点。
+ * The injection point that actually takes effect.
  *
- * 终端 "AI Agents" 下拉不走 ACP：TerminalAgentResolver.resolveLaunchSpec 把命令
- * 固定构造成 listOf(binaryPath)，TerminalAgent 接口没有任何参数位。
- * 而 LocalTerminalDirectRunner 在真正 spawn 进程前会调用
- * org.jetbrains.plugins.terminal.shellExecOptionsCustomizer 扩展点，
- * 并允许整体替换 execCommand —— 这里就是唯一能追加参数的地方。
+ * The terminal "AI Agents" dropdown does not go through ACP: TerminalAgentResolver.resolveLaunchSpec
+ * hardcodes the command as listOf(binaryPath), and the TerminalAgent interface has no parameter slot.
+ * LocalTerminalDirectRunner, however, calls the
+ * org.jetbrains.plugins.terminal.shellExecOptionsCustomizer extension point right before spawning the process,
+ * and allows replacing execCommand entirely — this is the only place where arguments can be appended.
  *
- * 该扩展点对所有终端启动都会回调（包括普通 zsh），因此必须按可执行文件名精确匹配，
- * 只有命中用户配置的 agent 才改写命令。
+ * This extension point is invoked for every terminal launch (including a plain zsh), so we must match by
+ * executable filename exactly; only a configured agent triggers command rewriting.
  */
 class TerminalSkipFlagCustomizer : ShellExecOptionsCustomizer {
 
@@ -31,8 +31,8 @@ class TerminalSkipFlagCustomizer : ShellExecOptionsCustomizer {
         val settings = AgentExtenderSettings.getInstance()
         val state = settings.state
 
-        // 只有命中已配置的自定义工具或权限规则，才认为这是一次 agent 启动。
-        // Windows 上文件名大小写不敏感（PATH 里可能是 Claude.CMD），比较一律忽略大小写。
+        // Only treat this as an agent launch when it matches a configured custom tool or permission rule.
+        // On Windows filenames are case-insensitive (PATH may contain Claude.CMD), so comparisons ignore case.
         val tool = state.customTools.firstOrNull {
             it.id.equals(exeName, ignoreCase = true) || baseName(it.command).equals(exeName, ignoreCase = true)
         }
@@ -43,19 +43,19 @@ class TerminalSkipFlagCustomizer : ShellExecOptionsCustomizer {
 
         val extra = mutableListOf<String>()
 
-        // 自定义工具的固定启动参数
+        // Fixed launch args for the custom tool
         tool?.baseArgs?.split(' ')?.filter { it.isNotBlank() }?.let { extra += it }
 
-        // 工具栏 “Skip permissions” 勾选框打开时，才追加 skip 参数。
-        // flag 可能是多个 token（如 cline 的 "--auto-approve true"），必须拆成独立 argv，
-        // 否则会变成一个带空格的单参数，任何平台上都解析不出来。
+        // Only append the skip args when the toolbar "Skip permissions" checkbox is on.
+        // The flag may be multiple tokens (e.g. cline's "--auto-approve true"), so it must be split into
+        // separate argv entries; otherwise it becomes a single space-containing argument that cannot be parsed on any platform.
         if (state.skipEnabled && rule != null) {
             val tokens = rule.flag.split(' ').filter { it.isNotBlank() }
             if (tokens.isNotEmpty() && tokens[0] !in command) extra += tokens
         }
 
-        // 少数 agent（如 goose）没有 skip 参数，只认环境变量；必须在进程启动前设置，
-        // 不能拼到命令行后面——那样只会变成一个位置参数。
+        // A few agents (e.g. goose) have no skip arg and only recognize an env var; it must be set before the
+        // process starts, not appended to the command line — otherwise it would just become a positional argument.
         if (state.skipEnabled) {
             DefaultSkipEnvs.forId(exeName)?.let { (name, value) ->
                 options.setEnvironmentVariable(name, value)

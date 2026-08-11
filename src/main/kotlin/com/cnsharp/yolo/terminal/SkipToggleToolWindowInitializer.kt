@@ -1,5 +1,6 @@
 package com.cnsharp.yolo.terminal
 
+import com.cnsharp.yolo.settings.AgentExtenderSettings
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.diagnostic.Logger
@@ -7,19 +8,23 @@ import com.intellij.openapi.wm.ToolWindow
 import org.jetbrains.plugins.terminal.TerminalToolWindowInitializer
 
 /**
- * 把「Skip permissions」勾选框和设置齿轮放到 AI Agents 下拉两侧。
+ * Place the "Skip permissions" checkbox and the settings gear on either side of the AI Agents dropdown.
  *
- * 终端前端的 TerminalToolWindowTabsManagerImpl$Initializer 通过
- * toolWindowInitializer 扩展点执行，并调用
+ * The terminal frontend's TerminalToolWindowTabsManagerImpl$Initializer runs via the
+ * toolWindowInitializer extension point and calls
  *   setTitleActions([LaunchSelectedAgent, ChevronSelector, AgentSelector])
- * 把下拉放在标题栏右侧（tab actions 才是左侧，之前放错了区域）。
+ * to put the dropdown on the right side of the title bar (tab actions are on the left; it was previously in the wrong area).
  *
- * 本 initializer 注册在其后（order="last"），因此能拿到已经设置好的状态，
- * 重新调用 setTitleActions 排成：勾选框 → 原下拉三件套 → 设置齿轮。
+ * This initializer is registered after it (order="last"), so it can read the already-configured state and
+ * re-call setTitleActions to arrange: checkbox -> original dropdown trio -> settings gear.
  */
 class SkipToggleToolWindowInitializer : TerminalToolWindowInitializer {
 
     override fun initialize(toolWindow: ToolWindow) {
+        // The terminal tool window is initialized during startup; this hook triggers an agent sync once per IDE
+        // session, adding currently installed agents to the config and removing the need for manual "reload". Idempotent; repeated calls are harmless.
+        AgentExtenderSettings.getInstance().ensureSyncScheduled()
+
         val am = ActionManager.getInstance()
         val skipAction = am.getAction(SKIP_ACTION_ID)
         if (skipAction == null) {
@@ -33,7 +38,7 @@ class SkipToggleToolWindowInitializer : TerminalToolWindowInitializer {
             return
         }
 
-        // 设置齿轮缺失不算致命：下拉和勾选框照常安装，只是少一个入口
+        // A missing settings gear is not fatal: the dropdown and checkbox are still installed, just one entry point short.
         val settingsAction = am.getAction(SETTINGS_ACTION_ID)
         if (settingsAction == null) {
             LOG.warn("AI Agents Extender: action $SETTINGS_ACTION_ID not found, settings button cannot be installed")
@@ -50,7 +55,7 @@ class SkipToggleToolWindowInitializer : TerminalToolWindowInitializer {
         private const val SKIP_ACTION_ID = "com.cnsharp.yolo.SkipPermissionsAction"
         private const val SETTINGS_ACTION_ID = "com.cnsharp.yolo.OpenSettingsAction"
 
-        /** AI Agents 下拉的三个 action，顺序与终端前端一致。 */
+        /** The three actions of the AI Agents dropdown, ordered consistently with the terminal frontend. */
         private val AI_AGENTS_ACTION_IDS = listOf(
             "Terminal.AiAgents.LaunchSelectedAgent",
             "Terminal.AiAgents.ChevronSelector",

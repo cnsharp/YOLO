@@ -8,9 +8,10 @@ plugins {
 }
 
 /**
- * 产品名的唯一来源是 messages/YoloBundle.properties 里的 `plugin.name`。
- * 这里读出来喂给 pluginConfiguration.name（它会覆写 plugin.xml 的 <name>），
- * 于是 UI 文案、插件市场名称、Settings 页标题全部来自同一处，改名只改一行。
+ * The single source of truth for the product name is `plugin.name` in
+ * messages/YoloBundle.properties. We read it here and feed it to pluginConfiguration.name
+ * (which overrides plugin.xml's <name>), so UI text, the Marketplace name, and the Settings
+ * page title all come from one place — renaming only requires editing a single line.
  */
 val bundleFile = file("src/main/resources/messages/YoloBundle.properties")
 val productName: String = Properties().apply {
@@ -19,15 +20,16 @@ val productName: String = Properties().apply {
     ?: error("plugin.name missing from ${bundleFile.path}")
 
 /**
- * 版本号的唯一来源是 gradle.properties 里的 `pluginVersion`（CI 可用 -PpluginVersion=x 覆盖）。
- * 必须赋给 project.version：Gradle 的归档任务默认从它取 archiveVersion，
- * 之前只设了 pluginConfiguration.version，project.version 停在 "unspecified"，
- * 分发产物就退化成不带版本号的 yolo.zip。
+ * The single source of truth for the version is `pluginVersion` in gradle.properties
+ * (CI can override it with -PpluginVersion=x). It must be assigned to project.version:
+ * Gradle's archive tasks take archiveVersion from it by default. Previously only
+ * pluginConfiguration.version was set, leaving project.version at "unspecified", so the
+ * distributed artifact degenerated into a version-less yolo.zip.
  */
 version = providers.gradleProperty("pluginVersion").get()
 
 intellijPlatform {
-    // 用本机已装的 IDEA 作为 SDK 进行离线构建（不下载 IntelliJ SDK）
+    // Use the locally installed IDEA as the SDK for offline builds (no IntelliJ SDK download).
     pluginConfiguration {
         id = "com.cnsharp.yolo"
         name = productName
@@ -45,21 +47,34 @@ intellijPlatform {
 repositories {
     mavenCentral()
     intellijPlatform {
-        // JetBrains 官方仓库：IntelliJ Platform 与 bundled 插件（terminal 等）从这里解析
+        // JetBrains' official repository: where the IntelliJ Platform and bundled plugins
+        // (terminal, etc.) are resolved from.
         defaultRepositories()
-        // 本地离线构建用：从本机已装 IDEA 解析 bundled 插件（与 dependencies 里的 local(...) 配套）。
-        // 本地用：取消下一行注释。
+        // For local offline builds: resolve bundled plugins from the locally installed IDEA
+        // (pairs with local(...) in dependencies below).
+        // For local use: uncomment the next line.
         // localPlatformArtifacts()
     }
 }
 
 dependencies {
     intellijPlatform {
-        // CI / Release 工作流（无本机 IDEA）：下载 IntelliJ Platform 进行构建
-        // 用 Ultimate 以匹配本机开发环境（TerminalAgentProvider 等内部 API 在此可解析）
-        create(IntelliJPlatformType.IntellijIdeaUltimate, "2026.2")
-        // 本地离线构建：取消下一行注释，并注释掉上面的 intellijIdea(...) 那行
-        // local(file("/Applications/IntelliJ IDEA.app"))
+        // When a local IDEA is present, use `local` (offline, no download); if CI/Release
+        // doesn't provide that property, fall back to `create` (downloads).
+        // Resolution order: -PlocalIdeaPath (CLI) > local.properties (gitignored) > download.
+        val localProps = Properties().apply {
+            val f = rootProject.file("local.properties")
+            if (f.exists()) f.inputStream().use { load(it) }
+        }
+        val localIdeaPath = providers.gradleProperty("localIdeaPath").orNull
+            ?: localProps.getProperty("localIdeaPath")
+        if (localIdeaPath != null) {
+            local(file(localIdeaPath))
+        } else {
+            // Use Ultimate to match the local dev environment (internal APIs like
+            // TerminalAgentProvider resolve here).
+            create(IntelliJPlatformType.IntellijIdeaUltimate, "2026.2")
+        }
         bundledPlugin("org.jetbrains.plugins.terminal")
     }
 }
