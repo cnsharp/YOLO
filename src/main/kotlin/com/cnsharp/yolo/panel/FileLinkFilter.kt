@@ -82,7 +82,7 @@ class FileLinkFilter(
          * slash/word/dot is excluded so the pattern never reaches into a `http(s)://` URL's own path.
          */
         private val PATH_PATTERN: Pattern = Pattern.compile(
-            """(?<![\\/\w.])(?:(?:\b[A-Za-z]:)?[\\/]?(?:[^\\/:*?"<>|\s]+[\\/])+[^\\/:*?"<>|\s]+(?:\.\w+)?)(?::(\d+))?(?:-(\d+))?(?::(\d+))?"""
+            """(?<![\\/\w.])((?:\b[A-Za-z]:)?[\\/]?(?:[^\\/:*?"<>|\s]+[\\/])+[^\\/:*?"<>|\s]+(?:\.\w+)?)(?::(\d+))?(?:-(\d+))?(?::(\d+))?"""
         )
 
         /** Quoted path (allows embedded spaces); requires an absolute-ish path (starts with `/` or a drive). */
