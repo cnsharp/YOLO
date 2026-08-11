@@ -1,7 +1,9 @@
 # YOLO: AI Agents Extender
 
 An IntelliJ IDEA plugin that gives you a standalone **YOLO** panel — a dedicated tool window (right side, **y** icon)
-that lists your AI CLI tools and lets you launch any of them in **YOLO mode** (skip-permissions) with a single click.
+that lists your AI CLI tools and launches any of them in a **real, interactive terminal inside the IDE**, with a single
+click. What makes it different: **everything the agent prints becomes clickable** — file paths, stack traces, type names,
+and URLs all turn into navigation links — so you can jump from the agent's output straight to the code.
 
 It is built entirely on **public IntelliJ APIs**, so it passes JetBrains Marketplace verification and can be published
 like any normal plugin. It does **not** hook into or depend on IDEA's Terminal plugin.
@@ -17,14 +19,17 @@ like any normal plugin. It does **not** hook into or depend on IDEA's Terminal p
 A tool window (right side, **y** icon) that replicates the Terminal's **AI Agents** experience without touching
 any internal Terminal API:
 
-- Lists every configured agent — promoted agents (Claude Code, Codex, CodeBuddy, …) plus your own custom tools.
+- Lists your **installed** agents — promoted agents (Claude Code, Codex, CodeBuddy, …) plus your own custom tools.
+  Agents that aren't detected on `PATH` simply aren't shown, so the list stays relevant to this machine.
 - **Claude Code** and **Codex** are pinned at the top of the list.
-- Each row shows the agent's icon, name, and its configured skip flag; rows whose command isn't on `PATH` are dimmed.
+- Each row shows the agent's icon, name, and its configured skip flag.
+- The dropdown loads **instantly from a cached install scan** — the detection done on a previous run is reused, and a
+  background re-scan refreshes the list only when the set of installed agents actually changes.
 - A **YOLO (Skip Permissions)** toggle sits in the panel header, left of the settings gear.
 
 ### YOLO mode
 
-A **YOLO (Skip Permissions)** toggle in the panel header. Turn it on and the next Launch starts the agent with its
+A **YOLO (Skip Permissions)** toggle in the panel header. Turn it on and the next launch starts the agent with its
 permission-bypass flag appended — `--dangerously-skip-permissions` for Claude Code, `--yolo` for Codex, `-y` for
 CodeBuddy, and so on.
 
@@ -41,10 +46,36 @@ environment variable instead of a flag; those are handled too.
 terminal emulator the IDE itself bundles) that renders the agent's TUI in place. Prompts, editors, and your rc-defined
 `PATH` (nvm / fnm / npm global bin, …) all work because the agent runs through an interactive login shell.
 
+- **The caret lands in the terminal automatically** when an agent launches, so you can type right away.
+- **Ctrl+C interrupts the agent.** With the terminal focused, Ctrl+C is delivered to it as SIGINT (the same way
+  IDEA's own Terminal works) instead of being intercepted by IDEA's global Copy shortcut.
+
 > This is built entirely on **public APIs**: JediTerm and PTY4J are third-party libraries shipped with the IntelliJ
 > Platform (not `@ApiStatus.Internal` / `@Experimental` Terminal APIs), so the plugin stays publishable on the
 > JetBrains Marketplace. The IDE's own `ConsoleView` is output-only (no interactive input), so a real agent can only
 > live in the panel by embedding a true terminal — which is exactly what this does.
+
+### Clickable terminal output
+
+While the agent runs, its output is scanned for references and turned into hyperlinks. Clicking a link jumps you to the
+right place and **auto-hides the YOLO panel** so it no longer covers the editor.
+
+| You print… | Becomes a link to… |
+|---|---|
+| `src/foo/Bar.kt:42`, `/abs/Bar.kt:42:13`, `C:\foo\Bar.kt:7` | the file at that line / column |
+| `./Makefile:10`, `~/x/y.kt:3`, `file:///abs/x.kt` | the file (home-relative and `file://` URIs supported) |
+| `path:12-18` | the file at the start of the line range |
+| `"/path with space/Bar.kt":5` | a quoted path containing spaces |
+| `Bar.java:123`, `Bar.kt:12` | a bare stack-trace frame |
+| `File "app/main.py", line 42` | a Python / JS traceback frame |
+| `plugin.xml`, `build.gradle.kts`, `README.md` | a bare file name anywhere in the project |
+| `com.foo.Bar` / `Bar` | the class declaration (qualified or project-local simple name) |
+| `Bar.method` / `Bar#method` | the specific method / field / inner class |
+| `https://example.com` | the URL, opened in your system browser (panel is **not** hidden) |
+
+- **Line/column navigation** works for paths, stack frames, and member references.
+- **No-extension files** (`Makefile`, `Dockerfile`) and **Windows paths** are handled.
+- URLs are the exception: clicking one opens your browser but keeps the panel open.
 
 > ### Warning — about YOLO mode
 >
@@ -101,7 +132,7 @@ Everything lives in one table. Each row is an agent, and each row carries its ow
 
 | Column | Meaning |
 |---|---|
-| Icon | The bundled icon for promoted agents; your file or a default bolt for custom tools. Greyed out when the command isn't on `PATH` |
+| Icon | The bundled icon for promoted agents; your file or a default bolt for custom tools. Greyed out in this table when the command isn't on `PATH` |
 | ID | Unique identifier |
 | Display name | The name shown in the YOLO panel |
 | Command | Executable name — must resolve on `PATH` |
@@ -125,7 +156,7 @@ Only the Skip flag is editable on promoted agents. That's deliberate: the plugin
 - **Duplicates are caught while you type.** A repeated ID or command turns the status line red
   immediately, and Apply refuses to save. Commands are compared by executable name, so
   `/usr/bin/claude` and `claude.cmd` count as the same tool.
-- **Installed agents are detected on each startup.** In the background the plugin checks every known agent's command — first on `PATH`, then by actually running it once (`--version`) — and adds the promoted agents it finds installed. This runs on **every startup, not just the first**, so a tool you install later (e.g. Gemini installed via npm) shows up automatically. It does **not** auto-discover arbitrary tools you wrote yourself — add those as custom tools.
+- **Installed agents are detected on each startup.** In the background the plugin checks every known agent's command — first on `PATH`, then by actually running it once (`--version`) — and adds the promoted agents it finds installed. This runs on **every startup, not just the first**, so a tool you install later (e.g. Gemini installed via npm) shows up automatically. It does **not** auto-discover arbitrary tools you wrote yourself — add those as custom tools. The result is cached so the panel opens instantly afterwards.
 - **Validate** checks a row's command the same way (PATH first, then running it once) and downloads its icon URL if it has one.
 
 ### Known agents
@@ -172,12 +203,16 @@ grep "AI Agents Extender" ~/.cache/JetBrains/IntelliJIdea<version>/log/idea.log
 grep "AI Agents Extender" "$env:LOCALAPPDATA\JetBrains\IntelliJIdea<version>\log\idea.log"
 ```
 
-**An agent is missing from the panel.** Its command isn't resolving on `PATH`. Check the Settings
-table — a dimmed entry means not found. Note that the IDE inherits the `PATH` of whatever
-launched it, which may differ from your shell's.
+**An agent is missing from the panel.** Its command isn't resolving on `PATH`. The panel only lists
+agents detected as installed; run a settings **Validate** on the row, or check that the command resolves in the
+shell that launched the IDE (the IDE may inherit a different `PATH` than your interactive shell).
 
 **The flag isn't being applied.** Confirm the YOLO toggle is on and the row has a Skip flag. The log
 line for each launch shows the final command, including whether anything was injected.
+
+**A printed path / type name isn't clickable.** Links only appear when the reference resolves to a real file or
+class in the current project (so random words aren't linked). Make sure the file is inside a content root and, for
+type names, that the Java module is enabled.
 
 **Settings changes don't take effect.** The plugin registers a `Configurable`, which IDEA cannot
 load dynamically. Restart the IDE after installing or updating.

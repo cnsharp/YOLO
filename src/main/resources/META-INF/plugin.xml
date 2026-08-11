@@ -8,11 +8,12 @@
     <version>0.2.0</version>
     <vendor email="support@cnsharp.com" url="">CnSharp Studio</vendor>
     <description><![CDATA[
-<p><b>YOLO</b> is a standalone <b>AI Agents</b> panel for IntelliJ IDEA. It lists your AI CLIs (Claude Code, Codex, CodeBuddy, Qoder, or your own) and lets you launch any of them in <b>YOLO mode</b> with a single click — no Terminal plugin required.</p>
+<p><b>YOLO</b> is a standalone <b>AI Agents</b> panel for IntelliJ IDEA. It lists your AI CLIs (Claude Code, Codex, CodeBuddy, Qoder, or your own) and launches any of them in a <b>real, interactive terminal inside the IDE</b> with a single click — no Terminal plugin required. Everything the agent prints becomes <b>clickable</b>: jump from its output straight to the code.</p>
 <ul>
-  <li><b>YOLO panel</b> — A dedicated tool window (right side, <b>y</b> icon) that replicates the Terminal's AI Agents experience, built entirely on public IntelliJ APIs so it passes Marketplace verification.</li>
+  <li><b>YOLO panel</b> — A dedicated tool window (right side, <b>y</b> icon) that replicates the Terminal's AI Agents experience, built entirely on public IntelliJ APIs so it passes Marketplace verification. The agent list loads instantly from a cached install scan and refreshes in the background.</li>
   <li><b>YOLO mode</b> — A "Skip permissions" toggle in the panel. When on, the next agent launches with its skip-permissions flag (e.g. <code>--dangerously-skip-permissions</code>, <code>--yolo</code>, <code>-y</code>). Per-agent, fully configurable, and <b>off by default</b>.</li>
-  <li><b>In-IDE console</b> — Launching an agent opens it in a real PTY-backed console tab inside the YOLO panel, so the agent runs interactively without leaving the IDE.</li>
+  <li><b>Real in-panel terminal</b> — Launching an agent opens it in a genuine PTY-backed terminal (JediTerm + PTY4J, the same emulator IDEA bundles). Focus lands in the terminal automatically and <b>Ctrl+C</b> interrupts the agent (SIGINT) instead of triggering IDEA's Copy.</li>
+  <li><b>Clickable terminal output</b> — File paths (<code>src/Foo.kt:42</code>, <code>~/x/y.kt:3</code>, <code>C:\foo\Bar.kt:7</code>, line ranges, quoted paths), stack-trace frames (<code>Bar.java:123</code>, Python <code>File "x", line N</code>), bare file names (<code>plugin.xml</code>), Java/Kotlin type names and <code>Class.member</code> references, and <code>http(s)://</code> URLs all become links. Clicking a file/type/member opens it in the editor and auto-hides the panel; URLs open in your browser.</li>
 </ul>
 
 <p><b>⚠️ Warning — about "YOLO mode" / the skip-permissions flag:</b> letting an AI agent run commands and edit files <b>without confirmation</b> can make irreversible changes, execute untrusted code, or expose your system. These risks come entirely from the agent and the bypass flag itself. <b>This plugin only flips that flag for you — it adds no such behavior of its own</b>, performs no actions on your behalf, and is not responsible for what the agent does. Enable YOLO mode only in trusted environments.</p>
