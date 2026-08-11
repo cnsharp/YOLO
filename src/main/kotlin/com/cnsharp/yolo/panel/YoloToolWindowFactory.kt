@@ -303,6 +303,10 @@ private class YoloPanel(
                         // triggers a clean recompute (no ghost artifacts).
                         swapTerminal(widget, process)
                         widget.start()
+                        // Hand keyboard focus to the terminal so the caret lands in the agent's
+                        // panel (user can type immediately) and Ctrl+C is delivered to the terminal
+                        // as SIGINT instead of being intercepted by IDEA's global Copy shortcut.
+                        SwingUtilities.invokeLater { widget.getTerminalPanel().requestFocusInWindow() }
                     } catch (e: Exception) {
                         LOG.warn("AI Agents Extender: failed to embed terminal for ${row.displayName}", e)
                     }
