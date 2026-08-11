@@ -74,6 +74,9 @@ dependencies {
             // Use Ultimate to match the local dev environment.
             create(IntelliJPlatformType.IntellijIdeaUltimate, "2026.2")
         }
+        // PSI-based type-name navigation (JavaPsiFacade / PsiShortNamesCache / NavigationUtil) needs the
+        // Java plugin on the compile/runtime classpath.
+        bundledPlugin("com.intellij.java")
     }
 }
 

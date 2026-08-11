@@ -23,6 +23,8 @@
     <idea-version since-build="261"/>
     <!-- Declares a platform module dependency to avoid the warning that this would be treated as a legacy plugin loadable only in IntelliJ IDEA -->
     <depends>com.intellij.modules.platform</depends>
+    <!-- PSI-based type-name navigation (JavaPsiFacade / PsiShortNamesCache / NavigationUtil) requires the Java module. -->
+    <depends>com.intellij.modules.java</depends>
 
     <!-- Default (English) resource bundle for all user-visible text; YoloBundle_zh.properties provides Chinese.
          The action's text/description is also resolved by the platform from here via action.<id>.text. -->

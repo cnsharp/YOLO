@@ -10,6 +10,7 @@ import com.cnsharp.yolo.settings.OpenSettingsAction
 import com.cnsharp.yolo.settings.PromotedAgents
 import com.cnsharp.yolo.terminal.AgentIcons
 import com.cnsharp.yolo.util.baseName
+import com.cnsharp.yolo.YoloConstants
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.DefaultActionGroup
@@ -281,11 +282,17 @@ private class YoloPanel(
                     .setRedirectErrorStream(true)
                     .start()
                 val connector = object : ProcessTtyConnector(process, StandardCharsets.UTF_8) {
-                    override fun getName(): String = "YOLO"
+                    override fun getName(): String = YoloConstants.ID
                 }
                 ApplicationManager.getApplication().invokeLater {
                     try {
                         val widget = JediTermWidget(YoloTerminalSettings())
+                        // Turn file references (path[:line[:col]]) printed by the agent into clickable
+                        // links that open the file in the IDE editor.
+                        widget.addHyperlinkFilter(FileLinkFilter(project, dir))
+                        // Turn type references (qualified names and project simple names) into clickable
+                        // links that jump to their PSI declaration.
+                        widget.addHyperlinkFilter(TypeLinkFilter(project))
                         widget.setTtyConnector(connector)
                         // Add to a laid-out container and force a grid recompute first, then start — so the
                         // terminal's character grid is sized to the real component and a scale change later
