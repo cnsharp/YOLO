@@ -287,12 +287,16 @@ private class YoloPanel(
                 ApplicationManager.getApplication().invokeLater {
                     try {
                         val widget = JediTermWidget(YoloTerminalSettings())
-                        // Turn file references (path[:line[:col]]) printed by the agent into clickable
-                        // links that open the file in the IDE editor.
+                        // File references (path[:line[:col]], ranges, ~/, file://, quoted paths with spaces).
                         widget.addHyperlinkFilter(FileLinkFilter(project, dir))
-                        // Turn type references (qualified names and project simple names) into clickable
-                        // links that jump to their PSI declaration.
+                        // Stack-trace frames / tracebacks where only the file name is printed (Bar.java:123, File "x", line N).
+                        widget.addHyperlinkFilter(StackTraceLinkFilter(project, dir))
+                        // Type references (qualified names and project simple names) → class declaration.
                         widget.addHyperlinkFilter(TypeLinkFilter(project))
+                        // Class.member / Class#member → the specific method/field/inner class.
+                        widget.addHyperlinkFilter(MemberLinkFilter(project))
+                        // http(s):// URLs → system browser (does not hide the pane).
+                        widget.addHyperlinkFilter(UrlLinkFilter())
                         widget.setTtyConnector(connector)
                         // Add to a laid-out container and force a grid recompute first, then start — so the
                         // terminal's character grid is sized to the real component and a scale change later

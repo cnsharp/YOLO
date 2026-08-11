@@ -1,11 +1,7 @@
 package com.cnsharp.yolo.panel
 
-import com.intellij.openapi.application.ReadAction
-import com.intellij.openapi.fileEditor.FileEditorManager
-import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
-import com.intellij.openapi.vfs.LocalFileSystem
 import com.jediterm.terminal.model.hyperlinks.HyperlinkFilter
 import com.jediterm.terminal.model.hyperlinks.LinkInfo
 import com.jediterm.terminal.model.hyperlinks.LinkResult
@@ -16,13 +12,16 @@ import java.util.regex.Pattern
 /**
  * Makes file references printed by agents clickable in the embedded terminal.
  *
- * Matches references of the form `path`, `path:line`, or `path:line:column` — e.g.
- * `src/foo/Bar.kt:42`, `/abs/Bar.kt:42:13`, `C:\foo\Bar.kt:7` — and, when the file actually exists
- * in the project, renders them as a hyperlink. Clicking opens the file in the IDE editor at the
- * referenced line/column.
+ * Matches references of the form `path`, `path:line`, `path:line:column`, and `path:line-line` (a line
+ * range — opens at the start line), e.g. `src/foo/Bar.kt:42`, `/abs/Bar.kt:42:13`, `C:\foo\Bar.kt:7`,
+ * `./Makefile:10`, `~/x/y.kt:3`. Paths inside quotes (allowing embedded spaces, e.g.
+ * `"/path with space/Bar.kt":5`) are also linked. `file://` URIs are accepted. When the file actually
+ * exists in the project (or the agent's working dir / a content root), the reference becomes a hyperlink
+ * that opens it in the IDE editor; clicking also hides the YOLO pane.
  *
  * Built entirely on public APIs: JediTerm's [HyperlinkFilter] / [LinkInfo] for the terminal link, and
- * IntelliJ's [OpenFileDescriptor] / [FileEditorManager] for navigation — so it stays Marketplace-safe.
+ * IntelliJ's [com.intellij.openapi.fileEditor.OpenFileDescriptor] / [com.intellij.openapi.fileEditor.FileEditorManager]
+ * for navigation — so it stays Marketplace-safe.
  */
 class FileLinkFilter(
     private val project: Project,
@@ -32,22 +31,41 @@ class FileLinkFilter(
     override fun apply(text: String): LinkResult? {
         if (text.isBlank()) return null
         val items = mutableListOf<LinkResultItem>()
-        val matcher = PATH_PATTERN.matcher(text)
-        while (matcher.find()) {
-            val rawPath = matcher.group(1)
-            val line = matcher.group(2)?.toIntOrNull()
-            val column = matcher.group(3)?.toIntOrNull()
-            val file = resolve(rawPath) ?: continue
-            val link = yoloHyperlink(project) { open(file, line, column) }
+
+        // Standard (unquoted) path references.
+        val m = PATH_PATTERN.matcher(text)
+        while (m.find()) {
+            val raw = m.group(1)
+            val line = m.group(2)?.toIntOrNull()
+            val column = m.group(4)?.toIntOrNull()
+            val file = resolve(raw) ?: continue
+            val link = yoloHyperlink(project) { openFileAt(project, file, line, column) }
             // Span the whole reference (path + optional :line:column) so a click anywhere navigates.
-            items.add(LinkResultItem(matcher.start(1), matcher.end(), link))
+            items.add(LinkResultItem(m.start(1), m.end(), link))
         }
+
+        // Quoted paths (may contain spaces).
+        val q = QUOTED_PATTERN.matcher(text)
+        while (q.find()) {
+            val raw = q.group(2)
+            val line = q.group(3)?.toIntOrNull()
+            val column = q.group(4)?.toIntOrNull()
+            val file = resolve(raw) ?: continue
+            val link = yoloHyperlink(project) { openFileAt(project, file, line, column) }
+            items.add(LinkResultItem(q.start(2), q.end(), link))
+        }
+
         return if (items.isEmpty()) null else LinkResult(items)
     }
 
     /** Resolve a possibly-relative path against the agent's working dir and the project's content roots. */
     private fun resolve(raw: String): File? {
         val candidates = mutableListOf<File>()
+        when {
+            raw.startsWith("file://") -> candidates += File(raw.removePrefix("file://"))
+            raw.startsWith("~/") -> candidates += File(System.getProperty("user.home"), raw.removePrefix("~/"))
+            raw == "~" -> candidates += File(System.getProperty("user.home"))
+        }
         candidates += File(raw)
         candidates += File(baseDir, raw)
         for (root in ProjectRootManager.getInstance(project).contentRoots) {
@@ -56,22 +74,20 @@ class FileLinkFilter(
         return candidates.firstOrNull { it.isFile }
     }
 
-    private fun open(file: File, line: Int?, column: Int?) {
-        ReadAction.run<Throwable> {
-            val vFile = LocalFileSystem.getInstance().findFileByIoFile(file) ?: return@run
-            // OpenFileDescriptor uses 0-based line/column; agent output is 1-based.
-            val descriptor = OpenFileDescriptor(project, vFile, (line ?: 1) - 1, (column ?: 1) - 1)
-            FileEditorManager.getInstance(project).openTextEditor(descriptor, true)
-        }
-    }
-
     companion object {
         /**
          * A path token must contain at least one separator, optionally start with a Windows drive letter,
-         * and end with `<name>.<ext>`. It may be followed by `:line` and `:column`.
+         * end with `<name>.<ext>` (the extension is optional so no-extension files like `Makefile`/`Dockerfile`
+         * are supported), and may be followed by `:line`, `:line-line` (range) and/or `:column`. A leading
+         * slash/word/dot is excluded so the pattern never reaches into a `http(s)://` URL's own path.
          */
         private val PATH_PATTERN: Pattern = Pattern.compile(
-            """((?:\b[A-Za-z]:)?[\\/]?(?:[^\\/:*?"<>|\s]+[\\/])+[^\\/:*?"<>|\s]+\.\w+)(?::(\d+))?(?::(\d+))?"""
+            """(?<![\\/\w.])(?:(?:\b[A-Za-z]:)?[\\/]?(?:[^\\/:*?"<>|\s]+[\\/])+[^\\/:*?"<>|\s]+(?:\.\w+)?)(?::(\d+))?(?:-(\d+))?(?::(\d+))?"""
+        )
+
+        /** Quoted path (allows embedded spaces); requires an absolute-ish path (starts with `/` or a drive). */
+        private val QUOTED_PATTERN: Pattern = Pattern.compile(
+            """(["'])((?:[A-Za-z]:)?[\\/][^"']*?\.\w+)\1(?::(\d+))?(?::(\d+))?"""
         )
     }
 }
