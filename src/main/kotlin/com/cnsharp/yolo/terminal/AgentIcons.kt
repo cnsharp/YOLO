@@ -8,24 +8,24 @@ import java.io.File
 import javax.swing.Icon
 
 /**
- * 自定义工具在下拉列表里显示的图标。
+ * Icons displayed for custom tools in the dropdown list.
  *
- * 三级回退，任何一级失败都不会让下拉条目消失：
- *   1. 用户在 Settings 里指定的图标文件（iconPath，本地绝对路径）
- *   2. 随插件打包的官方图标（按 agent id 匹配 BUNDLED）
- *   3. 通用图标 DEFAULT
+ * Three-level fallback; failure at any level will not make the dropdown entry disappear:
+ *   1. Icon file specified by the user in Settings (iconPath, local absolute path)
+ *   2. Official icon bundled with the plugin (matched to BUNDLED by agent id)
+ *   3. Generic icon DEFAULT
  *
- * 随包图标命名规则与终端内置图标一致：`<name>.svg` + `<name>_dark.svg`，
- * IconLoader 按当前主题自动选用 _dark 变体。尺寸统一 16x16。
+ * Bundled icon naming follows the terminal built-in convention: `<name>.svg` + `<name>_dark.svg`,
+ * IconLoader automatically selects the _dark variant based on the current theme. Uniform size 16x16.
  */
 object AgentIcons {
 
     private val LOG = Logger.getInstance(AgentIcons::class.java)
 
-    /** 下拉图标的标准边长，与内置的 claude-code.svg / codex.svg 对齐。 */
+    /** Standard edge length for dropdown icons, aligned with built-in claude-code.svg / codex.svg. */
     private const val SIZE = 16
 
-    /** 随插件打包的官方图标：agent id -> classpath 资源路径。 */
+    /** Official icons bundled with the plugin: agent id -> classpath resource path. */
     private val BUNDLED: Map<String, String> = mapOf(
         "codebuddy" to "/icons/agents/codebuddy.svg",
         "gemini"    to "/icons/agents/gemini.png",
@@ -43,21 +43,21 @@ object AgentIcons {
         "pi"        to "/icons/agents/pi.svg"
     )
 
-    /** Skip permissions 勾选框的 y 图标（关/开）。 */
+    /** y icon for the Skip permissions checkbox (off/on). */
     val SKIP_Y_OFF: Icon by lazy { loadBundled("/icons/agents/skipY.svg") }
     val SKIP_Y_ON: Icon by lazy { loadBundled("/icons/agents/skipYOn.svg") }
 
-    /** 没有专属图标的自定义工具用这个。 */
+    /** Used by custom tools that have no dedicated icon. */
     val DEFAULT: Icon = AllIcons.Actions.Lightning
 
-    /** 缓存 key 带上 iconPath，用户改了路径后 key 变化会自然重新加载。 */
+    /** Cache key includes iconPath, so changing the path naturally triggers a reload. */
     private val cache = HashMap<String, Icon>()
 
     /**
-     * 取某个工具的图标。
+     * Get the icon for a tool.
      *
-     * @param agentId  工具 id，用于匹配随包官方图标
-     * @param iconPath 用户指定的图标文件绝对路径，留空表示不指定
+     * @param agentId  tool id, used to match the bundled official icon
+     * @param iconPath absolute path of the icon file specified by the user; empty means unspecified
      */
     @Synchronized
     fun forAgent(agentId: String, iconPath: String = ""): Icon {
@@ -72,13 +72,13 @@ object AgentIcons {
         return icon
     }
 
-    /** 用户改了配置后调用，让下次取图标重新读盘。 */
+    /** Called after the user changes config, so the next icon fetch re-reads from disk. */
     @Synchronized
     fun clearCache() {
         cache.clear()
     }
 
-    /** 从本地文件加载；失败返回 null 交给上层回退，不抛异常。 */
+    /** Load from local file; on failure return null to let the caller fall back, no exception thrown. */
     private fun loadUserIcon(iconPath: String): Icon? {
         val path = iconPath.trim()
         if (path.isEmpty()) return null
@@ -94,7 +94,7 @@ object AgentIcons {
                 LOG.warn("AI Agents Extender: unrecognized icon format, ignored: $path")
                 return null
             }
-            // 用户图标未必是 16x16，统一缩到标准尺寸，避免撑坏下拉行高
+            // User icons may not be 16x16; scale to standard size to avoid breaking the dropdown row height
             if (raw.iconWidth == SIZE && raw.iconHeight == SIZE) raw
             else IconUtil.resizeSquared(raw, SIZE)
         } catch (e: Exception) {

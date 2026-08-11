@@ -3,9 +3,11 @@ package com.cnsharp.yolo.settings
 import com.cnsharp.yolo.YoloBundle.message
 
 /**
- * 校验自定义工具的「命令」是否可解析：确认它在 PATH / 绝对路径上找得到。
- * 经 AgentDetector.isOnPath 直接用 command -v / where 解析（登录 shell 兼容
- * nvm / Homebrew 注入的 PATH），不实际执行命令本身。
+ * Validate whether a custom tool's "command" is usable: confirm it can actually be executed
+ * (not just checked against PATH).
+ * Via AgentDetector.canExecute, the command is really run in an "interactive login shell" to confirm —
+ * this detects binaries whose PATH was injected by rc files (.zshrc / .bashrc) (e.g. npm-globally
+ * installed codebuddy), which a plain `command -v` (only sees the login shell's PATH) would miss.
  */
 object CommandValidator {
 
@@ -17,7 +19,7 @@ object CommandValidator {
     fun validate(command: String): Result {
         val cmd = command.trim()
         if (cmd.isEmpty()) return Result.NotFound(message("error.command.empty"))
-        return if (AgentDetector.isOnPath(cmd)) Result.Ok
+        return if (AgentDetector.canExecute(cmd)) Result.Ok
         else Result.NotFound(message("error.command.notOnPath", cmd))
     }
 }

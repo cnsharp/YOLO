@@ -30,7 +30,7 @@ see at a glance what's actually installed.
 
 A **YOLO (Skip Permissions)** toggle sits in the Terminal toolbar, immediately left of the AI Agents
 dropdown. Turn it on and the next agent you launch starts with its permission-bypass flag appended —
-`--dangerously-skip-permissions` for Claude Code, `--yolo` for Codex, `-y` for CodeBuddy, and so on.
+`--dangerously-skip-permissions` for Claude Code, `--yolo` for Codex, `--allow-all` for Copilot, and so on.
 
 The flag is **per agent** and fully configurable. The plugin knows the correct flag for 17 common
 agents and pre-fills it, but every value is editable and nothing is hardcoded at runtime. A few
@@ -61,17 +61,30 @@ A gear button on the right of the dropdown opens the plugin's settings directly.
 The Terminal AI Agents dropdown was opened to third-party agents in 2026.1; on earlier versions the
 extension points this plugin relies on do not exist.
 
-## Installation
+## Build
 
-**From disk** — download or build `yolo-<version>.zip`, then
-`Settings | Plugins | ⚙ | Install Plugin from Disk…` and pick the zip. Restart when prompted.
-
-Building it yourself:
+Build with the standard Gradle task:
 
 ```bash
 ./gradlew buildPlugin
 # → build/distributions/yolo-{version}.zip
 ```
+
+**Building against a locally installed IDEA** — by default the plugin compiles against the IntelliJ
+SDK pinned in `gradle.properties`. To build against the IDE on your machine instead, create a
+`local.properties` file at the project root pointing at its installation:
+
+```properties
+localIdeaPath=/Applications/IntelliJ IDEA.app
+```
+
+This overrides the SDK with your local IDE, which is useful when matching a specific IDE version or
+testing against an internal API that differs from the pinned SDK.
+
+## Installation
+
+**From disk** — build or download the `yolo-<version>.zip` (see [Build](#build)), then
+`Settings | Plugins | ⚙ | Install Plugin from Disk…` and pick the zip. Restart when prompted.
 
 ### Releases
 
@@ -105,7 +118,7 @@ Everything lives in one table. Each row is an agent, and each row carries its ow
 Rows come in three kinds, listed in descending priority:
 
 1. **IDEA built-in agents** — read-only, cannot be removed, keep IDEA's icons
-2. **Agents this plugin knows about** (CodeBuddy, Gemini, Cline, …) — read-only, sorted by ID
+2. **Agents this plugin knows about** (Gemini, Cline, CodeBuddy, …) — read-only, sorted by ID
 3. **Your own custom tools** — fully editable, in the order you created them
 
 Only the Skip flag is editable on the first two kinds. That's deliberate: the plugin should extend
@@ -119,8 +132,8 @@ the dropdown, not take it over.
 - **Duplicates are caught while you type.** A repeated ID or command turns the status line red
   immediately, and Apply refuses to save. Commands are compared by executable name, so
   `/usr/bin/claude` and `claude.cmd` count as the same tool.
-- **First run pre-fills known agents.** On first run, the plugin scans `PATH` in the background and adds the built-in and promoted agents it finds installed. It does **not** auto-discover arbitrary tools you wrote yourself — add those as custom tools.
-- **Validate** checks a row's command against `PATH` and downloads its icon URL if it has one.
+- **Installed agents are detected on each startup.** In the background the plugin checks every known agent's command — first on `PATH`, then by actually running it once (`--version`) — and adds the promoted agents it finds installed. This runs on **every startup, not just the first**, so a tool you install later (e.g. Gemini installed via npm) shows up automatically. It does **not** auto-discover arbitrary tools you wrote yourself — add those as custom tools.
+- **Validate** checks a row's command the same way (PATH first, then running it once) and downloads its icon URL if it has one.
 
 ### Known agents
 
@@ -151,17 +164,20 @@ Anything not listed here works fine as a custom tool; just fill in its flag your
 
 ---
 
-## Languages
-
-English by default, with Simplified Chinese included. The plugin follows your IDE's language
-setting — install the Chinese language pack and its UI switches with everything else.
-
 ## Troubleshooting
 
-The plugin logs every launch it touches. To see what actually ran:
+The plugin logs every launch it touches. To see what actually ran, grep the IDE log
+(`<version>` is the IDE's build, e.g. `2026.2`):
 
 ```bash
+# macOS
 grep "AI Agents Extender" ~/Library/Logs/JetBrains/IntelliJIdea<version>/idea.log
+
+# Linux
+grep "AI Agents Extender" ~/.cache/JetBrains/IntelliJIdea<version>/log/idea.log
+
+# Windows (PowerShell)
+grep "AI Agents Extender" "$env:LOCALAPPDATA\JetBrains\IntelliJIdea<version>\log\idea.log"
 ```
 
 **An agent is missing from the dropdown.** Its command isn't resolving on `PATH`. Check the Settings

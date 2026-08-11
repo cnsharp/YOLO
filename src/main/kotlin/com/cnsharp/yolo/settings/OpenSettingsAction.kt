@@ -7,19 +7,21 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.options.ShowSettingsUtil
 
 /**
- * 终端标题栏上的齿轮按钮，紧贴 AI Agents 下拉右边，一键打开本插件的配置页。
+ * The gear button on the terminal title bar, right next to the AI Agents dropdown, opening this plugin's
+ * settings page with one click.
  *
- * 由 SkipToggleToolWindowInitializer 通过 toolWindowInitializer 扩展点装入。
- * 按 Configurable 的类而不是显示名定位配置页：显示名会随 IDE 语言变化，类不会。
+ * Installed by SkipToggleToolWindowInitializer via the toolWindowInitializer extension point.
+ * Locate the settings page by the Configurable class rather than its display name: the display name changes
+ * with the IDE language, the class does not.
  */
-/* 文案不在这里硬编码：plugin.xml 里 <action> 已声明 <resource-bundle>，
- * 平台会按 action.<id>.text / .description 从 YoloBundle 里取，并跟随 IDE 语言切换。 */
+/* The text is not hardcoded here: the <action> in plugin.xml already declares <resource-bundle>,
+ * so the platform pulls action.<id>.text / .description from YoloBundle and follows the IDE language switch. */
 class OpenSettingsAction : AnAction(AllIcons.General.Settings) {
 
     override fun actionPerformed(e: AnActionEvent) {
         ShowSettingsUtil.getInstance().showSettingsDialog(e.project, AgentExtenderConfigurable::class.java)
     }
 
-    /** 没有 update 逻辑，图标与文案都是静态的，后台线程求值即可。 */
+    /** No update logic; the icon and text are static, so evaluating on a background thread is fine. */
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 }

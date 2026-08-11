@@ -8,25 +8,25 @@ import com.intellij.openapi.components.Storage
 import com.intellij.util.xmlb.XmlSerializerUtil
 import org.jetbrains.plugins.terminal.agent.TerminalAgent
 
-/** 单个工具的「跳过权限」规则：只保存该 agent 的 skip 参数值；
- *  是否真正注入由工具栏全局 “Skip permissions” 勾选框（skipEnabled）决定。 */
+/** "Skip permissions" rule for a single tool: only stores this agent's skip flag value;
+ *  whether it is actually injected is decided by the toolbar's global "Skip permissions" checkbox (skipEnabled). */
 data class PermissionRule(
     var agentId: String = "",
     var flag: String = "--dangerously-skip-permissions"
 )
 
-/** 一个出现在终端「AI Agents」下拉里的自定义工具（用户追加的，区别于 IDEA 内置 agent）。 */
+/** A custom tool that appears in the terminal "AI Agents" dropdown (user-added, distinct from IDEA's built-in agents). */
 data class CustomTool(
     var id: String = "",
     var displayName: String = "",
     var command: String = "",
     var baseArgs: String = "",
-    /** 下拉里显示的图标，本地文件绝对路径（.svg 最佳，也支持 .png）。留空则按 id 找随包图标，再回退默认。 */
+    /** Icon shown in the dropdown: absolute path to a local file (.svg preferred, .png also supported). If blank, an icon bundled with the package is looked up by id, falling back to a default. */
     var iconPath: String = ""
 )
 
-/** 各 agent 的 skip-permission 默认值（仅作便利预填，IDEA 本身不暴露此信息）。
- *  不在表中的 agent 不自动预填，由用户在权限规则表手动添加。 */
+/** Default skip-permission flags per agent (convenience prefill only; IDEA itself does not expose this info).
+ *  Agents not in the table are not auto-prefilled; the user adds them manually in the permission rules table. */
 object DefaultSkipFlags {
     private val map: Map<String, String> = mapOf(
         // IDEA built-in agents
@@ -64,17 +64,17 @@ object DefaultSkipEnvs {
     fun forId(id: String): Pair<String, String>? = map[id.lowercase()]
 }
 
-/** IDEA 内置支持的 agent：动态取自 TerminalAgentProvider（排除本插件自己的 provider）。
- *  IDEA 升级新增了内置 agent 时，这里会自动跟着变，无需再硬编码清单。 */
+/** IDEA's built-in agents: dynamically taken from TerminalAgentProvider (excluding this plugin's own provider).
+ *  When an IDEA upgrade adds a new built-in agent, this updates automatically — no need to hardcode a list. */
 object BuiltInAgents {
     fun all(): List<TerminalAgent> =
         TerminalAgent.getAllTerminalAgents()
             .filter { !it.agentKey.key.startsWith("custom.", ignoreCase = true) }
 }
 
-/** 本插件额外推广、但 IDEA 未内置的 agent（需写入 customTools 才出现在下拉）。
- *  与 BuiltInAgents 不同：这部分是插件主动提供的便捷项，并非 IDEA 原生支持，
- *  所以仍需硬编码——IDEA 不发布的 agent 我们无法“动态”得知。 */
+/** Agents additionally promoted by this plugin but not built into IDEA (must be written to customTools to appear in the dropdown).
+ *  Unlike BuiltInAgents: these are convenience entries offered proactively by the plugin, not natively supported by IDEA,
+ *  so they still need hardcoding — we cannot "dynamically" learn about agents IDEA does not publish. */
 object PromotedAgents {
     data class Meta(val id: String, val displayName: String, val command: String)
     val entries: List<Meta> = listOf(
@@ -101,47 +101,46 @@ class AgentExtenderSettings : PersistentStateComponent<AgentExtenderSettings.Sta
 
     private var currentState: State = State()
 
-    private var preloadScheduled = false
+    private var syncScheduled = false
 
     init {
-        // 首次运行（无已保存配置）时，异步探测已安装 agent 并预加载。
-        // 必须在后台线程执行（探测会 spawn 进程），绝不能在 EDT 上做。
-        ensurePreloadScheduled()
+        // On every IDE startup (first access to the service, i.e. one session), trigger one background sync:
+        // add the currently "installed" built-in / promoted agents into the config so the terminal dropdown
+        // and settings panel reflect the latest install state.
+        // The old logic only probed once when the config was empty, so agents installed after first run (e.g. codebuddy)
+        // could never get in and you had to clear the config and rerun — which is exactly why "reload on every startup" is needed.
+        // Must run on a background thread (the probe spawns processes); never on the EDT.
+        ensureSyncScheduled()
     }
 
-    /** 若配置为空，调度一次后台探测预加载（仅执行一次）。 */
-    fun ensurePreloadScheduled() {
-        if (preloadScheduled) return
-        preloadScheduled = true
+    /** Schedule a background sync (once only; a flag guarantees idempotency, so repeated calls are harmless). */
+    fun ensureSyncScheduled() {
+        if (syncScheduled) return
+        syncScheduled = true
         val app = ApplicationManager.getApplication()
         app.executeOnPooledThread {
-            if (currentState.permissionRules.isEmpty() && currentState.customTools.isEmpty()) {
-                preloadDetected()
-            }
+            syncInstalledAgents()
         }
     }
 
-    /** 首次运行（配置为空）时调用：探测 PATH 上已安装的候选 agent，把缺失的条目补进当前配置。
-     *  - 权限规则：对所有检测到的 agent（内置 + 推广）都加（需要 skip flag 注入）。
-     *  - 自定义工具：仅对“推广 agent”（IDEA 未内置，如 codebuddy）加；内置 agent 由 IDEA 下拉提供，不写 customTools。
-     *  注意：会 spawn 进程，调用方需确保在后台线程执行。 */
-    fun preloadDetected() {
-        // IDEA 内置 agent：命中 PATH 则补权限规则（不写 customTools）。
-        // 注意：规则 agentId 必须用 binaryName（如 "claude"），而不是 IDEA 的 agentKey（"claude_code"）——
-        // TerminalSkipFlagCustomizer 是按可执行文件名匹配的，用 agentKey 会永远匹配不上、skip 参数不注入。
+    /**
+     * Sync currently-installed agents into the config; called once per startup.
+     *  - Built-in agents: if detected as installed, add a permission rule (do not write customTools).
+     *  - Promoted agents (e.g. codebuddy, not built into IDEA): if detected as installed, add a permission rule
+     *    AND add to customTools so it appears in the terminal dropdown.
+     *  All are "skip if present" — idempotent and never deletes existing entries, so running once per startup is safe.
+     *  Note: spawns processes, so the caller must ensure this runs on a background thread.
+     */
+    fun syncInstalledAgents() {
         for (agent in BuiltInAgents.all()) {
             val id = agent.binaryName
-            if (!AgentDetector.isOnPath(id)) continue
+            if (!AgentDetector.canExecute(id)) continue
             if (currentState.permissionRules.none { it.agentId == id }) {
                 currentState.permissionRules.add(PermissionRule(id, DefaultSkipFlags.forId(id)))
             }
         }
-        // 插件推广 agent（IDEA 未内置）：命中 PATH 则补权限规则 + 加入 customTools。
-        // 规则 key 与 flag 都必须用 command（可执行文件名）而不是 id：
-        // cursor 的命令是 cursor-agent、continue 的命令是 cn，用 id 会既查不到默认 flag、
-        // 也永远匹配不上 TerminalSkipFlagCustomizer（它按可执行文件名匹配）。
         for ((id, displayName, command) in PromotedAgents.entries) {
-            if (!AgentDetector.isOnPath(command)) continue
+            if (!AgentDetector.canExecute(command)) continue
             if (currentState.permissionRules.none { it.agentId == command }) {
                 currentState.permissionRules.add(PermissionRule(command, DefaultSkipFlags.forId(command)))
             }
@@ -160,9 +159,9 @@ class AgentExtenderSettings : PersistentStateComponent<AgentExtenderSettings.Sta
     }
 
     class State {
-        // 工具栏全局 “Skip permissions” 勾选框状态；默认关闭，必须用户主动勾选才注入。
+        // Toolbar global "Skip permissions" checkbox state; off by default, only injected when the user explicitly checks it.
         var skipEnabled: Boolean = false
-        // 各 agent 的 skip 参数值（来自 Settings）；是否注入由 skipEnabled 控制。
+        // Each agent's skip flag value (from Settings); whether it is injected is controlled by skipEnabled.
         var permissionRules: MutableList<PermissionRule> = mutableListOf()
         var customTools: MutableList<CustomTool> = mutableListOf()
     }
@@ -170,6 +169,6 @@ class AgentExtenderSettings : PersistentStateComponent<AgentExtenderSettings.Sta
     companion object {
         fun getInstance(): AgentExtenderSettings =
             com.intellij.openapi.components.service<AgentExtenderSettings>()
-                .also { it.ensurePreloadScheduled() }
+                .also { it.ensureSyncScheduled() }
     }
 }
