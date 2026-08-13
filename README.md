@@ -47,8 +47,9 @@ terminal emulator the IDE itself bundles) that renders the agent's TUI in place.
 `PATH` (nvm / fnm / npm global bin, …) all work because the agent runs through an interactive login shell.
 
 - **The caret lands in the terminal automatically** when an agent launches, so you can type right away.
-- **Ctrl+C interrupts the agent.** With the terminal focused, Ctrl+C is delivered to it as SIGINT (the same way
-  IDEA's own Terminal works) instead of being intercepted by IDEA's global Copy shortcut.
+- **Ctrl+C is no longer hijacked by IDEA's Copy shortcut.** With the terminal focused, Ctrl+C passes through to the
+  embedded terminal instead of popping IDEA's "Shortcuts conflicts" dialog. Whether it interrupts the running agent
+  depends on the agent's own TUI.
 
 > This is built entirely on **public APIs**: JediTerm and PTY4J are third-party libraries shipped with the IntelliJ
 > Platform (not `@ApiStatus.Internal` / `@Experimental` Terminal APIs), so the plugin stays publishable on the
@@ -91,7 +92,7 @@ right place and **auto-hides the YOLO panel** so it no longer covers the editor.
 
 | | |
 |---|---|
-| IDE | IntelliJ IDEA **2026.1** or later (`since-build 261`) |
+| IDE | IntelliJ IDEA **2023.3** (build `233`) or later |
 | Dependencies | None beyond the IntelliJ Platform itself — the Terminal plugin is **not** required |
 
 ---
