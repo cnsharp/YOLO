@@ -1,0 +1,141 @@
+package com.cnsharp.yolo.panel
+
+import java.util.regex.Pattern
+
+/**
+ * Link-detection building blocks shared by the terminal [com.jediterm.terminal.model.hyperlinks.HyperlinkFilter]s.
+ *
+ * Everything here is public-API-only (regex + IntelliJ navigation), so the filters stay Marketplace-safe.
+ * Centralizing the patterns keeps the regex strings in one place (no drift between filters) and makes the
+ * group layouts documented below the single source of truth each filter references.
+ */
+
+/** Max hyperlinks a single terminal line may produce before the rest is ignored (defensive cap). */
+internal const val MAX_MATCHES_PER_LINE = 50
+
+/**
+ * A fixed allowlist of common programming / source / config file extensions across the IntelliJ-platform
+ * family (Java/Kotlin/Scala/Groovy, JS/TS, Python, Go, Rust, C/C++/C#, Ruby, PHP, Swift, ObjC, Dart,
+ * SQL, shell, markup & data formats, and IntelliJ's own project files).
+ *
+ * The terminal file-link filters use this instead of a generic "any word-char extension" rule, so a
+ * dotted name that is *not* a real file — e.g. `pay.amount.mark`, `JSON.parseObject`, `Ctrl/C` — is never
+ * mistaken for a file reference. Only names ending in one of these recognized extensions are linked.
+ *
+ * Case-insensitive (matched via `(?i:…)` wherever the fragment is embedded).
+ */
+internal val PROGRAMMING_EXT: String = buildList {
+    // JVM / static languages
+    addAll(listOf("kt", "kts", "java", "scala", "sc", "groovy", "gradle"))
+    // Dynamic / scripting
+    addAll(listOf("py", "pyi", "pyw", "rb", "rake", "php", "pl", "pm", "lua", "sh", "bash", "zsh", "ksh"))
+    // Web / front-end
+    addAll(listOf("js", "jsx", "mjs", "cjs", "ts", "tsx", "vue", "html", "htm", "xhtml", "css", "scss", "sass", "less", "styl"))
+    // Systems / native
+    addAll(listOf("go", "rs", "c", "h", "cc", "cpp", "cxx", "hpp", "hxx", "hh", "cs", "m", "mm", "swift", "d", "nim", "zig", "s", "asm"))
+    // Functional / other
+    addAll(listOf("ex", "exs", "clj", "cljs", "cljc", "erl", "hs", "ml", "mli", "fs", "fsx", "fsi", "jl", "r", "proto", "sol", "graphql", "gql"))
+    // Data / config / markup
+    addAll(listOf("xml", "xsd", "xsl", "xslt", "wsdl", "json", "json5", "jsonc", "yaml", "yml", "toml", "ini", "cfg", "conf", "config", "properties", "env", "lock", "csv", "tsv", "log"))
+    // Docs / misc
+    addAll(listOf("md", "markdown", "rst", "txt", "text", "diff", "patch", "editorconfig", "gitignore", "dockerignore", "tf", "tfvars", "feature", "bnf", "avsc", "edn"))
+    // IntelliJ project files
+    addAll(listOf("iml", "ipr", "iws"))
+}.joinToString("|")
+
+/**
+ * Path references printed by agents: `path`, `path:line`, `path:line:column`, `path:line-line` (range),
+ * `path:column` (a bare `:N` is treated as a line; a `:N:M` after it as column), and `file://` URIs.
+ * Drives [com.cnsharp.yolo.panel.FileLinkFilter].
+ *
+ * Windows is supported: drive letters (`C:\`, `C:\file.kt`), drive root, and UNC shares
+ * (`\\server\share\...`); `~` home is supported on every OS. A leading slash/word/dot is excluded so the
+ * pattern never reaches into a `http(s)://` URL's own path.
+ *
+ * **Completion requirement (extension OR `:line`):** the matched path must end in a recognized extension
+ * ([PROGRAMMING_EXT]) *or* be followed by a `:line` reference. This stops a long path the terminal
+ * *hard-wrapped* across lines from being linked as several broken fragments: the head fragment (e.g.
+ * `…/WEB-INF/cla`) has neither an extension nor a line number, so it is skipped; only a fragment that
+ * still looks like a complete file links.
+ *
+ * The component character class is ASCII-safe (`[A-Za-z0-9._\-]+`): any non-ASCII script naturally
+ * *terminates* the path instead of being absorbed, so a sentence like `扫描src/main/Foo.kt失效的key` links
+ * only `src/main/Foo.kt` and never the surrounding prose, for every language. (Trade-off: a name containing
+ * non-ASCII chars is not linked.)
+ *
+ * **Groups:** 1 = full path (without extension), 2 = extension, 3 = line, 4 = range end, 5 = column.
+ */
+internal val PATH_PATTERN: Pattern = Pattern.compile(
+    """(?<![\\/\w.])((?:(?:[A-Za-z]:[\\/]?)|[\\/]|[~][\\/]?|\\\\[A-Za-z0-9._\-]+(?:[\\/][A-Za-z0-9._\-]+)+|[A-Za-z0-9._\-]+[\\/])(?:[A-Za-z0-9._\-]+[\\/])*(?:[A-Za-z0-9._\-]+\.((?i:$PROGRAMMING_EXT))|[A-Za-z0-9._\-]+))(?::(\d+)(?:-(\d+))?(?::(\d+))?)?"""
+)
+
+/**
+ * Quoted path (allows embedded spaces), e.g. `"/path with space/Bar.kt":5`. Requires an absolute-ish path
+ * (starts with `/` or a drive) ending in a recognized programming extension. A `…` (U+2026) or three ASCII
+ * dots `...` inside the quotes marks a truncated path and is dropped by [FileLinkFilter].
+ *
+ * **Groups:** 1 = opening quote, 2 = path, 3 = line, 4 = column.
+ */
+internal val QUOTED_PATH_PATTERN: Pattern = Pattern.compile(
+    """(["'])((?:[A-Za-z]:)?[\\/][^"']*?\.(?i:$PROGRAMMING_EXT))\1(?::(\d+))?(?::(\d+))?"""
+)
+
+/**
+ * Bare `FileName.ext:line` / `FileName.ext:line:col` with no directory component (stack-trace frame,
+ * e.g. `at com.foo.Bar.method(Bar.java:123)`). Drives [com.cnsharp.yolo.panel.StackTraceLinkFilter].
+ *
+ * **Groups:** 1 = file, 2 = line, 3 = column.
+ */
+internal val STACK_BARE_PATTERN: Pattern = Pattern.compile(
+    """(?<![\\/\w.])([\w.\-]+\.(?i:$PROGRAMMING_EXT)):(\d+)(?::(\d+))?"""
+)
+
+/**
+ * Bare file name with no line number, e.g. `plugin.xml`, `build.gradle.kts` — only the base name. The
+ * extension must be a recognized programming extension so a dotted non-file (`pay.amount.mark`) is never
+ * linked, and a trailing boundary is required so it does not grab the start of a longer path or a
+ * `name:line` reference.
+ *
+ * **Groups:** 1 = file.
+ */
+internal val STACK_BARE_NAME_PATTERN: Pattern = Pattern.compile(
+    """(?<![\\/\w.])([\w.\-]+\.(?i:$PROGRAMMING_EXT))(?![\\/\w.:])"""
+)
+
+/** Python traceback `File "path", line N` (double-quoted). **Groups:** 1 = file, 2 = line. */
+internal val STACK_PY_DQ_PATTERN: Pattern = Pattern.compile(
+    """File "([^"]+\.(?i:$PROGRAMMING_EXT))", line (\d+)"""
+)
+
+/** Python traceback `File 'path', line N` (single-quoted). **Groups:** 1 = file, 2 = line. */
+internal val STACK_PY_SQ_PATTERN: Pattern = Pattern.compile(
+    """File '([^']+\.(?i:$PROGRAMMING_EXT))', line (\d+)"""
+)
+
+/**
+ * Type references: a qualified name (`com.foo.Bar`, inner classes `com.foo.Bar.Baz`) or a simple
+ * capitalized identifier (`Bar`). Neither may be preceded by a word char/dot/path separator, and both
+ * exclude a trailing lowercase extension (e.g. `.kt`) so they never collide with file-path links. Drives
+ * [com.cnsharp.yolo.panel.TypeLinkFilter].
+ *
+ * **Named groups:** `qualified`, `simple` (mutually exclusive — exactly one is non-null per match).
+ */
+internal val TYPE_NAME_PATTERN: Pattern = Pattern.compile(
+    """(?<![.\w/\\])(?<qualified>(?:[a-z][a-zA-Z0-9_]*\.)+(?:[A-Z][a-zA-Z0-9_]*+(?:\.[A-Z][a-zA-Z0-9_]*+)*))(?!\.[a-z])""" +
+        """|(?<![.\w/\\])(?<simple>[A-Z][a-zA-Z0-9_]*+)(?!\.[a-z])"""
+)
+
+/**
+ * `Class.member` / `Class#member` references, navigating to the specific method/field/inner class. A class
+ * reference (qualified name, or a simple capitalized identifier not preceded by a word/dot) followed by
+ * `.`/`#` and a member name; not preceded by a path separator so a path segment like `messages/YoloBundle`
+ * is never mistaken for a class. Drives [com.cnsharp.yolo.panel.MemberLinkFilter].
+ *
+ * **Named groups:** `class`, `member`.
+ */
+internal val MEMBER_REF_PATTERN: Pattern = Pattern.compile(
+    """(?<class>(?<![.\w/\\])(?:(?:[a-z][a-zA-Z0-9_]*\.)+(?:[A-Z][a-zA-Z0-9_]*+(?:\.[A-Z][a-zA-Z0-9_]*+)*)|[A-Z][a-zA-Z0-9_]*+))[.#](?<member>(?<![.\w])[A-Za-z_]\w*)"""
+)
+
+/** `http(s)://` URLs (no trailing whitespace/quote/bracket). Drives [com.cnsharp.yolo.panel.UrlLinkFilter]. */
+internal val URL_PATTERN: Pattern = Pattern.compile("""https?://[^\s<>"'\)\]]+""")

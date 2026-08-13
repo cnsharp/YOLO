@@ -6,7 +6,6 @@ import com.jediterm.terminal.model.hyperlinks.HyperlinkFilter
 import com.jediterm.terminal.model.hyperlinks.LinkInfo
 import com.jediterm.terminal.model.hyperlinks.LinkResult
 import com.jediterm.terminal.model.hyperlinks.LinkResultItem
-import java.util.regex.Pattern
 
 /**
  * Makes `http(s)://` URLs printed by agents clickable, opening them in the system browser.
@@ -23,7 +22,7 @@ import java.util.regex.Pattern
 class UrlLinkFilter : HyperlinkFilter {
 
     override fun apply(text: String): LinkResult? {
-        if (text.isBlank()) return null
+        if (text.isBlank() || isDiffLine(text)) return null
         val items = mutableListOf<LinkResultItem>()
         val matcher = URL_PATTERN.matcher(text)
         var guard = 0
@@ -37,10 +36,5 @@ class UrlLinkFilter : HyperlinkFilter {
             items.add(LinkResultItem(matcher.start(), matcher.end(), link))
         }
         return if (items.isEmpty()) null else LinkResult(items)
-    }
-
-    companion object {
-        private const val MAX_MATCHES_PER_LINE = 50
-        private val URL_PATTERN: Pattern = Pattern.compile("""https?://[^\s<>"'\)\]]+""")
     }
 }

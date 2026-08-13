@@ -1,5 +1,6 @@
 import org.jetbrains.intellij.platform.gradle.extensions.intellijPlatform
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
 plugins {
@@ -39,7 +40,11 @@ intellijPlatform {
             email = "support@cnsharp.com"
         }
         ideaVersion {
-            sinceBuild = "261"
+            // Backward-compatible down to 2023.3: the panel uses only public JediTerm/PTY4J + IntelliJ
+            // public APIs (no internal Terminal API). The few version-sensitive calls use their oldest
+            // still-present forms (ReadAction.run, TerminalColor(int), OpenFileDescriptor 4-arg,
+            // ContentFactory.getInstance(), FilenameIndex.getVirtualFilesByName(name, scope)).
+            sinceBuild = "233"
         }
     }
 }
@@ -71,8 +76,9 @@ dependencies {
         if (localIdeaPath != null) {
             local(file(localIdeaPath))
         } else {
-            // Use Ultimate to match the local dev environment.
-            create(IntelliJPlatformType.IntellijIdeaUltimate, "2026.2")
+            // Use Ultimate to match the local dev environment. Build against the oldest supported version
+            // (2023.3) so an accidental use of a newer-only API fails here instead of at Marketplace review.
+            create(IntelliJPlatformType.IntellijIdeaUltimate, "2023.3")
         }
         // PSI-based type-name navigation (JavaPsiFacade / PsiShortNamesCache / NavigationUtil) needs the
         // Java plugin on the compile/runtime classpath.
@@ -80,6 +86,40 @@ dependencies {
     }
 }
 
+// Unit tests run against the SAME local IDEA platform used for compilation (`intellijPlatformClasspath`),
+// which already resolves cleanly. We deliberately do NOT use the plugin's `testFramework(...)` helper:
+// on IDEA 2026.2 its `ModuleDescriptorsValueSource` fails to parse the new `namespace` attribute on the
+// platform's `<module>` descriptors (plugin 2.18.1 predates that schema), so the IntelliJ test classpath
+// cannot be assembled offline. Reusing the working main classpath keeps `:test` fully offline. JUnit 4 is
+// pulled once (cached) since release IDEA does not bundle it.
+dependencies {
+    testImplementation(files(configurations["intellijPlatformClasspath"]))
+    testImplementation("junit:junit:4.13.2")
+}
+
+tasks.withType<Test> {
+    useJUnit()
+}
+
 kotlin {
-    jvmToolchain(25)
+    // Target Java 17 bytecode: IDEA 2023.3 (the minimum we support) runs on JBR 17, so the plugin must
+    // not be compiled to a newer class-file version. We still compile *with* the local JBR 25, just
+    // emitting Java 17-compatible classes, which also run fine on newer IDEA (2026.2's JBR 25).
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+    }
+}
+
+// Keep the (empty) Java compile task consistent with the Kotlin target above — otherwise Gradle rejects
+// the mixed JVM targets. `release` lets us emit Java 17 class files using the local JBR 25.
+tasks.withType<JavaCompile> {
+    options.release.set(17)
+}
+
+// The IntelliJ Platform Gradle Plugin's instrumentCode task resolves the Gradle daemon JDK and, on a
+// foreign JDK, looks for a JBR-only "Packages" directory that no longer exists in IDEA 2026's bundled
+// runtime — failing the build with ".../Contents/Home/Packages does not exist". Disabling it only skips
+// nullability assertion instrumentation; the plugin still builds and runs correctly.
+tasks.named("instrumentCode") {
+    enabled = false
 }

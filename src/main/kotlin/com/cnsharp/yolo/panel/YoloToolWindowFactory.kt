@@ -16,10 +16,14 @@ import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
+import com.intellij.ide.IdeEventQueue
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
+import com.intellij.openapi.wm.ToolWindowType
+import com.intellij.openapi.wm.WindowManager
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.ui.SimpleListCellRenderer
@@ -28,22 +32,30 @@ import com.intellij.ui.components.JBPanel
 import com.intellij.ui.content.ContentFactory
 import com.intellij.util.ui.JBUI
 import com.jediterm.terminal.ProcessTtyConnector
-import com.jediterm.terminal.ui.JediTermWidget
 import com.jediterm.terminal.ui.settings.DefaultSettingsProvider
-import com.jediterm.core.util.TermSize
-import com.jediterm.terminal.RequestOrigin
+import com.jediterm.terminal.TerminalColor
+import com.jediterm.terminal.TextStyle
+import com.jediterm.terminal.emulator.ColorPalette
 import com.pty4j.PtyProcessBuilder
+import com.cnsharp.yolo.terminal.YoloColorPalette
+import com.cnsharp.yolo.terminal.YoloJediTermWidget
 import java.awt.BorderLayout
 import java.awt.Font
+import java.awt.Rectangle
+import java.awt.KeyboardFocusManager
 import java.awt.Toolkit
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
+import java.awt.event.InputEvent
+import java.awt.event.KeyEvent
 import java.beans.PropertyChangeListener
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
 import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * The standalone YOLO panel — a public ToolWindowFactory (registered in plugin.xml) that replicates the
@@ -59,11 +71,42 @@ import kotlin.math.max
  */
 class YoloToolWindowFactory : ToolWindowFactory {
 
+    private companion object {
+        /** Default width (px) the panel seeds to on first open; capped to the IDE frame width. */
+        const val PANEL_DEFAULT_WIDTH = 480
+        /** Never shrink below this even on very narrow windows. */
+        const val PANEL_MIN_WIDTH = 360
+    }
+
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
+        // Seed the panel's initial width AFTER the tool window is fully registered. Seeding from
+        // `init()` crashes on 2026.2: ToolWindowManagerImpl.setToolWindowAnchor dereferences a null
+        // internal descriptor during registration and throws "Cannot init toolwindow", which aborts
+        // the whole tool-window registration. Doing it here (post-registration) keeps the panel coming
+        // up and still applies the width to the first layout only.
+        seedInitialWidth(toolWindow)
         val panel = YoloPanel(project)
         val content = ContentFactory.getInstance().createContent(panel, null, false)
         content.setDisposer(panel)
         toolWindow.contentManager.addContent(content)
+    }
+
+    /**
+     * Seed the panel's *initial* width to ~38.2% of the IDE window (golden-ratio complement, leaving
+     * ~61.8% for the editor). Applied via [ToolWindow.setDefaultState] so it only affects the first
+     * layout; afterwards the user's own resize (persisted in workspace.xml) takes precedence.
+     *
+     * Best-effort only: a missed width is purely cosmetic, so guard the call. Never do this from
+     * [ToolWindowFactory.init] — that runs mid-registration and ToolWindowManagerImpl.setToolWindowAnchor
+     * dereferences a null internal descriptor and NPEs ("Cannot init toolwindow").
+     */
+    private fun seedInitialWidth(toolWindow: ToolWindow) {
+        val ideFrame = WindowManager.getInstance().getIdeFrame(toolWindow.project) ?: return
+        val ideWidth = ideFrame.component.width.takeIf { it > 0 } ?: return
+        val width = max(PANEL_MIN_WIDTH, min(ideWidth, PANEL_DEFAULT_WIDTH))
+        runCatching {
+            toolWindow.setDefaultState(toolWindow.anchor, ToolWindowType.DOCKED, Rectangle(0, 0, width, ideFrame.component.height))
+        }
     }
 }
 
@@ -91,6 +134,24 @@ private class YoloTerminalSettings : DefaultSettingsProvider() {
 
     override fun getTerminalFont(): Font = consoleFont
     override fun getTerminalFontSize(): Float = consoleFont.size.toFloat()
+
+    /**
+     * Use a 256-color-aware palette. JediTerm's default palette only resolves the first 16 ANSI
+     * indices and asserts `index < 16` for any 256-color (SGR `38;5;n`) text; with assertions enabled
+     * in the host JVM that throws from inside `paintComponent` and blanks the whole terminal. Our
+     * palette resolves indices 16..255 via the standard xterm-256 formula instead.
+     */
+    override fun getTerminalColorPalette(): ColorPalette = YoloColorPalette()
+
+    /**
+     * The default hyperlink color is pure `java.awt.Color.BLUE` (0,0,255) — far too bright for the panel.
+     * Use the user-configured color (Settings | Tools | YOLO), falling back to the muted steel-blue default.
+     */
+    override fun getHyperlinkColor(): TextStyle {
+        val rgb = runCatching { AgentExtenderSettings.getInstance().state.linkColorRgb }
+            .getOrDefault(AgentExtenderSettings.DEFAULT_LINK_COLOR_RGB)
+        return TextStyle(TerminalColor(rgb), null)
+    }
 }
 
 private class YoloPanel(
@@ -114,7 +175,7 @@ private class YoloPanel(
     /** Holds the live terminal widget; swapped on each agent launch. */
     private val terminalHolder = JBPanel<JBPanel<*>>(BorderLayout())
 
-    private var currentWidget: JediTermWidget? = null
+    private var currentWidget: YoloJediTermWidget? = null
     private var currentProcess: Process? = null
 
     /**
@@ -129,7 +190,43 @@ private class YoloPanel(
      * change the component's pixel size, so JediTerm never recomputes its grid and its cached image goes
      * stale — leaving ghost artifacts. We force a recompute ourselves.
      */
-    private val scaleChangeListener = PropertyChangeListener { forceTerminalResize(currentWidget) }
+    private val scaleChangeListener = PropertyChangeListener { forceReinit(currentWidget) }
+
+    /**
+     * Intercepts Ctrl+C while the embedded terminal has focus so the keystroke reaches the PTY as SIGINT
+     * (the terminal convention) instead of being swallowed by IDEA's global Copy shortcut.
+     *
+     * This MUST run ahead of IDEA's own keystroke processing. A plain [java.awt.Toolkit] AWT listener does
+     * NOT work: IDEA's [com.intellij.ide.IdeEventQueue] processes shortcuts at the head of the event queue,
+     * before Toolkit listeners fire, so the "Shortcuts conflicts" dialog would already be on screen by the
+     * time a Toolkit listener could consume the event. Registering an [com.intellij.ide.IdeEventQueue.EventDispatcher]
+     * instead lets us intercept the event first and return `true` to stop IDEA from ever treating it as a
+     * shortcut — no conflict dialog, no Copy action. We then deliver the key straight to JediTerm, which
+     * applies its own selection-aware rule (copy when there is a selection, otherwise SIGINT).
+     *
+     * Only the real terminal panel is affected — the dropdown, toolbar and the rest of the IDE keep their
+     * normal Ctrl+C behavior. ⌘C (macOS Copy) is left untouched because we require a plain Ctrl modifier.
+     */
+    private val ctrlCDispatcher = IdeEventQueue.EventDispatcher { event ->
+        if (event !is KeyEvent || event.id != KeyEvent.KEY_PRESSED) return@EventDispatcher false
+        // Plain Ctrl+C only — no Shift/Alt/Meta. Meta (⌘) is left to IDEA's Copy on macOS.
+        val mods = event.modifiersEx and
+            (InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK or InputEvent.ALT_DOWN_MASK or InputEvent.META_DOWN_MASK)
+        if (mods != InputEvent.CTRL_DOWN_MASK || event.keyCode != KeyEvent.VK_C) return@EventDispatcher false
+
+        val panel = currentWidget?.getTerminalPanel() ?: return@EventDispatcher false
+        val focus = KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner ?: return@EventDispatcher false
+        if (!SwingUtilities.isDescendingFrom(focus, panel)) return@EventDispatcher false
+
+        // Consume before IDEA's action system sees it, then deliver the key to JediTerm ourselves.
+        event.consume()
+        val forward = KeyEvent(
+            panel, KeyEvent.KEY_PRESSED, System.currentTimeMillis(),
+            InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_C, 'c'
+        )
+        panel.processKeyEvent(forward)
+        true
+    }
 
     init {
         layout = BorderLayout(0, JBUI.scale(6))
@@ -163,6 +260,11 @@ private class YoloPanel(
 
         // Track OS display-scale changes so the embedded terminal can recompute (see scaleChangeListener).
         Toolkit.getDefaultToolkit().addPropertyChangeListener("awt.font.desktophints", scaleChangeListener)
+
+        // Keep Ctrl+C for the embedded terminal (SIGINT) instead of IDEA's Copy — see ctrlCDispatcher.
+        // A Dispatcher intercepts the keystroke at the head of IDEA's event queue, ahead of its shortcut
+        // processing, which a Toolkit AWT listener cannot do (the conflict dialog would already be shown).
+        IdeEventQueue.getInstance().addDispatcher(ctrlCDispatcher, this)
 
         rebuild()
     }
@@ -232,7 +334,8 @@ private class YoloPanel(
         // when the panel opens and selectedIndex is set programmatically.
         addUnique(AgentRow("", message("panel.agentsPrompt"), "", "", "", ""))
         for (meta in PromotedAgents.entries) {
-            addUnique(AgentRow(meta.id, meta.displayName, meta.command, "", flagFor(meta.command, meta.id), ""))
+            val baseArgs = settings.agentBaseArgs[meta.id.lowercase()] ?: ""
+            addUnique(AgentRow(meta.id, meta.displayName, meta.command, baseArgs, flagFor(meta.command, meta.id), ""))
         }
         for (tool in settings.customTools) {
             addUnique(
@@ -293,7 +396,7 @@ private class YoloPanel(
                 }
                 ApplicationManager.getApplication().invokeLater {
                     try {
-                        val widget = JediTermWidget(YoloTerminalSettings())
+                        val widget = YoloJediTermWidget(YoloTerminalSettings())
                         // File references (path[:line[:col]], ranges, ~/, file://, quoted paths with spaces).
                         widget.addHyperlinkFilter(FileLinkFilter(project, dir))
                         // Stack-trace frames / tracebacks where only the file name is printed (Bar.java:123, File "x", line N).
@@ -305,6 +408,13 @@ private class YoloPanel(
                         // http(s):// URLs → system browser (does not hide the pane).
                         widget.addHyperlinkFilter(UrlLinkFilter())
                         widget.setTtyConnector(connector)
+                        // Warm the project-type cache off the terminal thread so the first streamed line
+                        // doesn't stall while the snapshot is built.
+                        if (!DumbService.isDumb(project)) {
+                            ApplicationManager.getApplication().executeOnPooledThread {
+                                runCatching { YoloProjectTypes.snapshot(project) }
+                            }
+                        }
                         // Add to a laid-out container and force a grid recompute first, then start — so the
                         // terminal's character grid is sized to the real component and a scale change later
                         // triggers a clean recompute (no ghost artifacts).
@@ -325,53 +435,45 @@ private class YoloPanel(
     }
 
     /** Replace the live terminal with a freshly started one. */
-    private fun swapTerminal(widget: JediTermWidget, process: Process) {
+    private fun swapTerminal(widget: YoloJediTermWidget, process: Process) {
         currentWidget?.close()
         currentProcess?.let { runCatching { it.destroyForcibly() } }
         terminalHolder.removeAll()
         terminalHolder.add(widget, BorderLayout.CENTER)
 
         // JediTerm caches a backing image sized to the component; on a resize or scale change the image
-        // can go stale and leave ghost glyphs. Recompute the grid (which recreates the image) on every
-        // resize, and once after the first layout settles.
+        // can go stale and leave ghost glyphs. Recompute JediTerm's own font metrics + grid (which
+        // recreates the image using its internal character-size math) on every resize, and once after the
+        // first layout settles.
         widget.addComponentListener(object : ComponentAdapter() {
             override fun componentResized(e: ComponentEvent) {
-                forceTerminalResize(widget)
+                forceReinit(widget)
             }
         })
         terminalHolder.revalidate()
         terminalHolder.repaint()
-        SwingUtilities.invokeLater { forceTerminalResize(widget) }
+        SwingUtilities.invokeLater { forceReinit(widget) }
 
         currentWidget = widget
         currentProcess = process
     }
 
     /**
-     * Force JediTerm to recompute its character grid from the panel's current size and font metrics, then
-     * repaint. This recreates the stale backing image (clearing ghost artifacts) after a resize or a scale
-     * change that JediTerm would otherwise ignore.
+     * Force JediTerm to recalculate its font metrics and recreate the backing image from the panel's
+     * current size. This clears ghost/duplicate glyphs that appear when JediTerm's cached image goes out
+     * of sync with the actual component size — e.g. after a layout settle or an OS display-scale change.
      */
-    private fun forceTerminalResize(widget: JediTermWidget?) {
+    private fun forceReinit(widget: YoloJediTermWidget?) {
         if (widget == null) return
-        val panel = widget.getTerminalPanel()
-        val size = panel.size
-        if (size.width <= 0 || size.height <= 0) return
-        val metrics = panel.getFontMetrics(panel.font)
-        val charWidth = metrics.charWidth('M')
-        val charHeight = metrics.height
-        if (charWidth <= 0 || charHeight <= 0) return
-        val cols = max(1, size.width / charWidth)
-        val rows = max(1, size.height / charHeight)
         try {
-            panel.onResize(TermSize(cols, rows), RequestOrigin.User)
+            widget.forceReinit()
         } catch (e: Exception) {
-            LOG.warn("AI Agents Extender: failed to resize embedded terminal", e)
+            LOG.warn("AI Agents Extender: failed to reinit embedded terminal", e)
         }
-        panel.repaint()
     }
 
     override fun dispose() {
+        IdeEventQueue.getInstance().removeDispatcher(ctrlCDispatcher)
         Toolkit.getDefaultToolkit().removePropertyChangeListener("awt.font.desktophints", scaleChangeListener)
         currentWidget?.close()
         currentProcess?.let { runCatching { it.destroyForcibly() } }

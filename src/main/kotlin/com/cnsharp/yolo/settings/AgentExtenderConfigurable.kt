@@ -2,6 +2,7 @@ package com.cnsharp.yolo.settings
 
 import com.cnsharp.yolo.Yolo
 import com.cnsharp.yolo.YoloBundle.message
+import com.cnsharp.yolo.settings.AgentExtenderSettings
 import com.cnsharp.yolo.terminal.AgentIcons
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
@@ -22,11 +23,13 @@ import com.cnsharp.yolo.util.baseName
 import com.intellij.util.ui.FormBuilder
 import javax.swing.event.TableModelEvent
 import java.awt.Component
+import java.awt.Color
 import java.awt.image.BufferedImage
 import javax.swing.GrayFilter
 import javax.swing.Icon
 import javax.swing.ImageIcon
 import javax.swing.JButton
+import javax.swing.JColorChooser
 import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JPanel
@@ -62,6 +65,32 @@ class AgentExtenderConfigurable : Configurable {
     private var promotedIds: Set<String> = emptySet()
 
     private val statusLabel = JLabel("")
+
+    /**
+     * Terminal hyperlink color swatch: shows the current color and opens a standard color chooser on click.
+     * Background holds the selected color; text shows its hex; foreground flips for contrast.
+     */
+    private val linkColorButton = JButton().apply {
+        addActionListener {
+            val chosen = JColorChooser.showDialog(this, message("settings.linkColor.title"), background)
+            if (chosen != null) {
+                linkColor = chosen
+                modified = true
+            }
+        }
+    }
+
+    /** Selected terminal link color (alpha stripped, so it round-trips with the persisted RGB int). */
+    private var linkColor: Color
+        get() = Color(linkColorButton.background.rgb and 0xFFFFFF)
+        set(value) {
+            linkColorButton.background = value
+            linkColorButton.foreground = if (isDark(value)) Color.WHITE else Color.BLACK
+            linkColorButton.text = "#%06X".format(value.rgb and 0xFFFFFF)
+        }
+
+    private fun isDark(c: Color): Boolean =
+        (0.299 * c.red + 0.587 * c.green + 0.114 * c.blue) < 128
 
     private var panel: JComponent? = null
 
@@ -101,6 +130,7 @@ class AgentExtenderConfigurable : Configurable {
             .addComponent(actionButtons)
             .addComponent(iconChooserButton())
             .addComponent(statusLabel)
+            .addLabeledComponent(JBLabel(message("settings.linkColor.label")), linkColorButton)
             .panel
         reset()
         return panel!!
@@ -166,9 +196,11 @@ class AgentExtenderConfigurable : Configurable {
             note.text = if (locked && row >= 0) message("icon.locked") else ""
         }
         browse.addActionListener {
+            // `withExtensionFilter` is only available on newer IDEA; use the long-stable `withFileFilter`
+            // (since 2019.2) so the settings UI also works on 2023.3.
             val descriptor = FileChooserDescriptorFactory
-                .createSingleFileDescriptor("svg")
-                .withExtensionFilter(message("icon.chooser.title"), "svg", "png")
+                .createSingleFileDescriptor()
+                .withFileFilter { it.extension == "svg" || it.extension == "png" }
             val initial = textField.text?.takeIf { it.isNotBlank() && !it.startsWith("http", true) }?.let {
                 LocalFileSystem.getInstance().findFileByPath(it)
             }
@@ -379,7 +411,8 @@ class AgentExtenderConfigurable : Configurable {
 
     // ── Persistence ──────────────────────────────────────────────────
 
-    override fun isModified(): Boolean = modified
+    override fun isModified(): Boolean =
+        modified || (linkColor.rgb and 0xFFFFFF) != AgentExtenderSettings.getInstance().state.linkColorRgb
 
     override fun apply() {
         // Duplicate ID/Command would create two same-named entries in the dropdown and skip rules would overwrite each other, so reject saving outright
@@ -402,6 +435,9 @@ class AgentExtenderConfigurable : Configurable {
         }
         settings.state.permissionRules = newRules
 
+        // ①b Terminal hyperlink color (alpha stripped so it round-trips with the persisted RGB int).
+        settings.state.linkColorRgb = linkColor.rgb and 0xFFFFFF
+
         // ② Custom tools: skip promoted agents (they are not written to customTools); only save user custom tools
         settings.state.customTools = (0 until toolsModel.rowCount).mapNotNull { r ->
             val id = (toolsModel.getValueAt(r, COL_ID) as? String)?.trim() ?: ""
@@ -416,6 +452,18 @@ class AgentExtenderConfigurable : Configurable {
                 iconPath = (toolsModel.getValueAt(r, COL_ICON_PATH) as? String)?.trim() ?: ""
             )
         }.toMutableList()
+
+        // ②b Persist "Base args" overrides for promoted agents (codebuddy, …). They are deliberately NOT
+        //    written into customTools (section ②), so a dedicated map is needed — otherwise an edit to a
+        //    promoted agent's Base args column would be silently discarded on Apply.
+        val baseArgsMap = settings.state.agentBaseArgs
+        baseArgsMap.clear()
+        for (r in 0 until toolsModel.rowCount) {
+            val id = (toolsModel.getValueAt(r, COL_ID) as? String)?.trim() ?: ""
+            if (id.lowercase() !in promotedIds) continue
+            val baseArgs = (toolsModel.getValueAt(r, COL_BASE_ARGS) as? String)?.trim() ?: ""
+            if (baseArgs.isNotEmpty()) baseArgsMap[id.lowercase()] = baseArgs
+        }
 
         AgentIcons.clearCache()
 
@@ -483,10 +531,11 @@ class AgentExtenderConfigurable : Configurable {
             //    read-only, not removable, icon fixed.
             promotedIds = PromotedAgents.entries.map { it.id.lowercase() }.toSet()
             for (meta in PromotedAgents.entries) {
+                val baseArgs = state.agentBaseArgs[meta.id.lowercase()] ?: ""
                 toolsModel.addRow(
                     arrayOf<Any>(
                         "", meta.id, meta.displayName, meta.command,
-                        "", flagFor(meta.command, meta.id), ""
+                        baseArgs, flagFor(meta.command, meta.id), ""
                     )
                 )
             }
@@ -504,6 +553,7 @@ class AgentExtenderConfigurable : Configurable {
                 )
             }
             refreshInstalledFlags()
+            linkColor = Color(state.linkColorRgb)
             setStatus("", warn = false)
         } finally {
             rebuilding = false

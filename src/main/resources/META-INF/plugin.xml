@@ -19,9 +19,11 @@
 <p><b>⚠️ Warning — about "YOLO mode" / the skip-permissions flag:</b> letting an AI agent run commands and edit files <b>without confirmation</b> can make irreversible changes, execute untrusted code, or expose your system. These risks come entirely from the agent and the bypass flag itself. <b>This plugin only flips that flag for you — it adds no such behavior of its own</b>, performs no actions on your behalf, and is not responsible for what the agent does. Enable YOLO mode only in trusted environments.</p>
 ]]></description>
 
-    <!-- Built and verified on IntelliJ IDEA 2026.1+ (build 261). until-build is left unlocked
-         to avoid blocking subsequent minor versions. -->
-    <idea-version since-build="261"/>
+    <!-- Minimum supported IDEA is 2023.3 (build 233); the actual value is enforced by `ideaVersion.sinceBuild`
+         in build.gradle.kts (which patches this element at build time). until-build is left unlocked to avoid
+         blocking subsequent minor versions. The panel uses only public JediTerm/PTY4J + IntelliJ APIs, so it
+         runs on any IDEA 2023.3+. -->
+    <idea-version since-build="233"/>
     <!-- Declares a platform module dependency to avoid the warning that this would be treated as a legacy plugin loadable only in IntelliJ IDEA -->
     <depends>com.intellij.modules.platform</depends>
     <!-- PSI-based type-name navigation (JavaPsiFacade / PsiShortNamesCache / NavigationUtil) requires the Java module. -->

@@ -46,19 +46,21 @@ internal fun openElementAt(project: Project, target: PsiElement) {
     }
 }
 
-/** Resolve a fully-qualified class name across the whole project (incl. JDK/library sources). */
+/** Resolve a fully-qualified class name across the project and its dependencies (incl. JDK/library sources). */
 internal fun resolveQualifiedClass(project: Project, fqn: String): PsiClass? = ReadAction.compute<PsiClass?, Throwable> {
-    JavaPsiFacade.getInstance(project).findClass(fqn, GlobalSearchScope.allScope(project))
+    JavaPsiFacade.getInstance(project).findClass(fqn, GlobalSearchScope.projectScope(project))
 }
 
-/** Resolve a simple class name, but only to a class inside the project's content roots. */
+/**
+ * Resolve a simple class name. Project-defined types take precedence; if the project has no such class,
+ * fall back to a library/imported type (IDEA will open its source if available, or decompile it).
+ */
 internal fun resolveSimpleClass(project: Project, name: String): PsiClass? = ReadAction.compute<PsiClass?, Throwable> {
     val cache = PsiShortNamesCache.getInstance(project)
-    val classes = cache.getClassesByName(name, GlobalSearchScope.allScope(project))
+    val classes = cache.getClassesByName(name, GlobalSearchScope.projectScope(project))
     val inProject = ProjectRootManager.getInstance(project).fileIndex
-    classes.firstOrNull { cls ->
-        cls.containingFile?.virtualFile?.let { inProject.isInContent(it) } == true
-    }
+    classes.firstOrNull { cls -> cls.containingFile?.virtualFile?.let { inProject.isInContent(it) } == true }
+        ?: classes.firstOrNull()
 }
 
 /** Find a member (method / field / inner class) by name within a class (incl. supers); null if absent. */

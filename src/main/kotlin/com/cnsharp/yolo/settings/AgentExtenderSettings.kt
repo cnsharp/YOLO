@@ -150,14 +150,29 @@ class AgentExtenderSettings : PersistentStateComponent<AgentExtenderSettings.Sta
         var permissionRules: MutableList<PermissionRule> = mutableListOf()
         var customTools: MutableList<CustomTool> = mutableListOf()
         /**
+         * Per-agent extra launch arguments (base args) keyed by lower-cased agent id. Only needed for
+         * promoted agents (e.g. codebuddy), because those are NOT written into [customTools] — without this
+         * map, an edit to a promoted agent's "Base args" column in Settings would be silently dropped on save.
+         * User-added custom tools store their base args on the [CustomTool] itself.
+         */
+        var agentBaseArgs: MutableMap<String, String> = mutableMapOf()
+        /**
          * Cache of commands (lower-cased) detected as installed on the machine. Persisted so the dropdown
          * loads instantly from this cache on the next open; a background re-scan refreshes it and only
          * touches the dropdown when the detected set actually differs.
          */
         var installedCommands: MutableList<String> = mutableListOf()
+        /**
+         * RGB of the YOLO panel terminal's hyperlink color. Defaults to a muted steel blue so links read
+         * as links without dominating the output; user-configurable via Settings | Tools | YOLO.
+         */
+        var linkColorRgb: Int = DEFAULT_LINK_COLOR_RGB
     }
 
     companion object {
+        /** Default terminal hyperlink color: a darker, muted steel blue (vs. JediTerm's pure BLUE 0x0000FF). */
+        const val DEFAULT_LINK_COLOR_RGB: Int = 0x1E64B4
+
         fun getInstance(): AgentExtenderSettings =
             com.intellij.openapi.components.service<AgentExtenderSettings>()
                 .also { it.ensureSyncScheduled() }
