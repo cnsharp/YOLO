@@ -1,5 +1,6 @@
 package com.cnsharp.yolo.terminal
 
+import com.jediterm.terminal.RequestOrigin
 import com.jediterm.terminal.model.StyleState
 import com.jediterm.terminal.model.TerminalTextBuffer
 import com.jediterm.terminal.ui.JediTermWidget
@@ -8,10 +9,16 @@ import com.jediterm.terminal.ui.settings.SettingsProvider
 
 /**
  * A [JediTermWidget] subclass whose terminal panel exposes [reinitFontAndResize] so the YOLO panel can
- * force JediTerm to recalculate its own font metrics and recreate the backing image after the widget is
- * laid out or the display scale changes. Using JediTerm's own resize path (instead of computing cols/rows
- * externally) prevents ghost/duplicate glyphs that appear when the terminal's cached image gets out of sync
- * with the actual component size.
+ * force JediTerm to recompute its grid after a layout settle or a scale change.
+ *
+ * Two flavors are exposed:
+ *  - [YoloTerminalPanel.forceReinit] — resize-only: recompute the character grid with JediTerm's *own*
+ *    cell math (`getTerminalSizeFromComponent` + `onResize`). This clears the ghost/duplicate glyphs that
+ *    appear when the cached image goes out of sync with the component size, but does NOT re-derive the
+ *    font. Re-running `initFont()` on every resize re-creates the `java.awt.Font` and blurs it on HiDPI
+ *    displays, so we avoid that on the frequent horizontal-resize path.
+ *  - [YoloTerminalPanel.forceReinitFull] — font + grid (`reinitFontAndResize`). Only needed when the OS
+ *    display scale / DPI changes, where the font itself must be re-derived to stay crisp.
  */
 class YoloJediTermWidget(settings: SettingsProvider) : JediTermWidget(settings) {
 
@@ -21,21 +28,38 @@ class YoloJediTermWidget(settings: SettingsProvider) : JediTermWidget(settings) 
         buffer: TerminalTextBuffer
     ): TerminalPanel = YoloTerminalPanel(settings, buffer, style)
 
-    /** Recalculate font metrics and resize the terminal grid/image. Safe to call multiple times. */
+    /** Resize-only recompute (clears ghosts without re-deriving the font — avoids HiDPI blur on resize). */
     fun forceReinit() {
         (myTerminalPanel as? YoloTerminalPanel)?.forceReinit()
+    }
+
+    /** Full font + grid recompute, for OS display-scale / DPI changes. */
+    fun forceReinitFull() {
+        (myTerminalPanel as? YoloTerminalPanel)?.forceReinitFull()
     }
 }
 
 /**
- * Exposes [reinitFontAndResize] publicly; the base method is `protected` and recreates the backing image
- * using JediTerm's internal character-size calculation (char width from 'W', height from font metrics +
- * line spacing).
+ * Exposes JediTerm's protected [reinitFontAndResize] plus a resize-only variant. The base method is
+ * `protected` and recreates the backing image using JediTerm's internal character-size calculation
+ * (char width from 'W', height from font metrics + line spacing).
  */
 class YoloTerminalPanel(
     settings: SettingsProvider,
     buffer: TerminalTextBuffer,
     style: StyleState
 ) : TerminalPanel(settings, buffer, style) {
-    fun forceReinit() = reinitFontAndResize()
+
+    /** Resize-only: recompute the grid from the component size using JediTerm's own cell math, then resize.
+     *  Skips [reinitFontAndResize]'s `initFont()` step so the font is not re-derived (and thus not blurred)
+     *  on every horizontal resize. */
+    fun forceReinit() {
+        val size = getTerminalSizeFromComponent() ?: return
+        onResize(size, RequestOrigin.User)
+    }
+
+    /** Full font + grid recompute. */
+    fun forceReinitFull() {
+        reinitFontAndResize()
+    }
 }

@@ -2,8 +2,9 @@ package com.cnsharp.yolo.panel
 
 import com.cnsharp.yolo.YoloBundle.message
 import com.cnsharp.yolo.launcher.SkipPermissionsAction
-import com.cnsharp.yolo.settings.AgentDetector
 import com.cnsharp.yolo.settings.AgentExtenderSettings
+import com.cnsharp.yolo.settings.AgentExtenderSettingsListener
+import com.cnsharp.yolo.settings.InstalledAgents
 import com.cnsharp.yolo.settings.DefaultSkipEnvs
 import com.cnsharp.yolo.settings.DefaultSkipFlags
 import com.cnsharp.yolo.settings.OpenSettingsAction
@@ -74,7 +75,7 @@ class YoloToolWindowFactory : ToolWindowFactory {
     private companion object {
         /** Default width (px) the panel seeds to on first open; capped to the IDE frame width. */
         const val PANEL_DEFAULT_WIDTH = 480
-        /** Never shrink below this even on very narrow windows. */
+        /** Floor for the seeded initial width: never seed narrower than this even on very narrow windows. */
         const val PANEL_MIN_WIDTH = 360
     }
 
@@ -190,7 +191,7 @@ private class YoloPanel(
      * change the component's pixel size, so JediTerm never recomputes its grid and its cached image goes
      * stale — leaving ghost artifacts. We force a recompute ourselves.
      */
-    private val scaleChangeListener = PropertyChangeListener { forceReinit(currentWidget) }
+    private val scaleChangeListener = PropertyChangeListener { (currentWidget as? YoloJediTermWidget)?.forceReinitFull() }
 
     /**
      * Intercepts Ctrl+C while the embedded terminal has focus so the keystroke reaches the PTY as SIGINT
@@ -266,6 +267,13 @@ private class YoloPanel(
         // processing, which a Toolkit AWT listener cannot do (the conflict dialog would already be shown).
         IdeEventQueue.getInstance().addDispatcher(ctrlCDispatcher, this)
 
+        // Refresh the dropdown when the user applies changes in Settings | Tools | YOLO (e.g. base-args edits),
+        // so an already-open panel picks up the new values instead of keeping its initial rows.
+        ApplicationManager.getApplication().messageBus.connect(this)
+            .subscribe(AgentExtenderSettings.CHANGED, object : AgentExtenderSettingsListener {
+                override fun changed() = rebuild()
+            })
+
         rebuild()
     }
 
@@ -278,9 +286,9 @@ private class YoloPanel(
         rescanInstalled(rows)
     }
 
-    /** Populate the dropdown from the persisted installed-agents cache (instant, no process probes). */
+    /** Populate the dropdown from the persisted installed-agents cache (instant, no PATH probes). */
     private fun populateFromCache(rows: List<AgentRow>) {
-        val installed = AgentExtenderSettings.getInstance().state.installedCommands.toSet()
+        val installed = InstalledAgents.installed()
         val visible = rows.filter { it.command.isBlank() || installed.contains(it.command.lowercase()) }
         agentCombo.removeAllItems()
         visible.forEach { agentCombo.addItem(it) }
@@ -290,22 +298,9 @@ private class YoloPanel(
     /** Re-scan installed agents on a background thread; update the cache and the dropdown only if it differs. */
     private fun rescanInstalled(rows: List<AgentRow>) {
         val gen = refreshGeneration.incrementAndGet()
-        val app = ApplicationManager.getApplication()
-        app.executeOnPooledThread {
-            val detected = rows
-                .filter { it.command.isNotBlank() && AgentDetector.canExecute(it.command) }
-                .map { it.command.lowercase() }
-                .toSet()
-            app.invokeLater {
-                // Ignore this callback if a newer rebuild has started in the meantime.
-                if (gen != refreshGeneration.get()) return@invokeLater
-                val state = AgentExtenderSettings.getInstance().state
-                if (detected != state.installedCommands.toSet()) {
-                    state.installedCommands.clear()
-                    state.installedCommands.addAll(detected.sorted())
-                    populateFromCache(rows)
-                }
-            }
+        InstalledAgents.rescan(rows.map { it.command }) {
+            // Ignore this callback if a newer rebuild has started in the meantime.
+            if (gen == refreshGeneration.get()) populateFromCache(rows)
         }
     }
 
@@ -441,10 +436,10 @@ private class YoloPanel(
         terminalHolder.removeAll()
         terminalHolder.add(widget, BorderLayout.CENTER)
 
-        // JediTerm caches a backing image sized to the component; on a resize or scale change the image
-        // can go stale and leave ghost glyphs. Recompute JediTerm's own font metrics + grid (which
-        // recreates the image using its internal character-size math) on every resize, and once after the
-        // first layout settles.
+        // JediTerm caches a backing image sized to the component; on a resize the grid can go stale and
+        // leave ghost glyphs. Recompute JediTerm's own grid (its internal character-size math) on every
+        // resize — this clears ghosts without re-deriving the font (which would blur it on HiDPI). A full
+        // font+grid recompute is reserved for OS display-scale changes (see scaleChangeListener).
         widget.addComponentListener(object : ComponentAdapter() {
             override fun componentResized(e: ComponentEvent) {
                 forceReinit(widget)
@@ -459,9 +454,10 @@ private class YoloPanel(
     }
 
     /**
-     * Force JediTerm to recalculate its font metrics and recreate the backing image from the panel's
-     * current size. This clears ghost/duplicate glyphs that appear when JediTerm's cached image goes out
-     * of sync with the actual component size — e.g. after a layout settle or an OS display-scale change.
+     * Resize-only recompute of the embedded terminal's grid from the panel's current size. Clears
+     * ghost/duplicate glyphs that appear when JediTerm's cached image goes out of sync with the actual
+     * component size, without re-deriving the font (which would blur it on HiDPI). Full font+grid
+     * recompute on display-scale changes goes through [YoloJediTermWidget.forceReinitFull] instead.
      */
     private fun forceReinit(widget: YoloJediTermWidget?) {
         if (widget == null) return

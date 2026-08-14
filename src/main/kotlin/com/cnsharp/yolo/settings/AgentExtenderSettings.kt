@@ -5,6 +5,7 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
+import com.intellij.util.messages.Topic
 import com.intellij.util.xmlb.XmlSerializerUtil
 
 /** "Skip permissions" rule for a single tool: only stores this agent's skip flag value;
@@ -173,8 +174,22 @@ class AgentExtenderSettings : PersistentStateComponent<AgentExtenderSettings.Sta
         /** Default terminal hyperlink color: a darker, muted steel blue (vs. JediTerm's pure BLUE 0x0000FF). */
         const val DEFAULT_LINK_COLOR_RGB: Int = 0x1E64B4
 
+        /** Fired on Settings | Tools | YOLO → Apply, so the live terminal panel can refresh its dropdown (e.g. base args). */
+        val CHANGED: Topic<AgentExtenderSettingsListener> =
+            Topic.create("AgentExtenderSettings.Changed", AgentExtenderSettingsListener::class.java)
+
         fun getInstance(): AgentExtenderSettings =
             com.intellij.openapi.components.service<AgentExtenderSettings>()
                 .also { it.ensureSyncScheduled() }
     }
+
+    /** Publish a change so subscribers (the YOLO terminal panel) can refresh their dropdown from current state. */
+    fun fireChanged() {
+        ApplicationManager.getApplication().messageBus.syncPublisher(CHANGED).changed()
+    }
+}
+
+/** Notified when the user applies changes in Settings | Tools | YOLO. */
+interface AgentExtenderSettingsListener {
+    fun changed()
 }
