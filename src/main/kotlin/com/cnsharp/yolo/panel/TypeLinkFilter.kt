@@ -6,6 +6,7 @@ import com.jediterm.terminal.model.hyperlinks.HyperlinkFilter
 import com.jediterm.terminal.model.hyperlinks.LinkInfo
 import com.jediterm.terminal.model.hyperlinks.LinkResult
 import com.jediterm.terminal.model.hyperlinks.LinkResultItem
+import java.io.File
 
 /**
  * Makes type references printed by agents clickable in the embedded terminal.
@@ -23,13 +24,18 @@ import com.jediterm.terminal.model.hyperlinks.LinkResultItem
  * Resolution uses only public PSI APIs ([com.intellij.psi.JavaPsiFacade] / [com.intellij.psi.search.PsiShortNamesCache])
  * and is skipped while the index is in dumb mode, so it stays Marketplace-safe and never blocks the terminal.
  */
-class TypeLinkFilter(private val project: Project) : HyperlinkFilter {
+class TypeLinkFilter(
+    private val project: Project?,
+    private val typesProvider: (Project?) -> YoloProjectTypes.Snapshot = { p ->
+        if (p != null) YoloProjectTypes.snapshot(p) else YoloProjectTypes.Snapshot(emptySet(), emptySet())
+    },
+) : HyperlinkFilter {
 
     override fun apply(text: String): LinkResult? {
-        if (text.isBlank() || isDiffLine(text) || DumbService.isDumb(project)) return null
+        if (text.isBlank() || isDiffLine(text) || (project != null && DumbService.isDumb(project))) return null
         // Only link names that are real project types, so ordinary capitalized words and shortcut
         // notations (e.g. the `Ctrl` in `Ctrl/C`) are not painted blue.
-        val types = YoloProjectTypes.snapshot(project)
+        val types = typesProvider(project)
         val items = mutableListOf<LinkResultItem>()
         val matcher = TYPE_NAME_PATTERN.matcher(text)
         var guard = 0
@@ -41,20 +47,35 @@ class TypeLinkFilter(private val project: Project) : HyperlinkFilter {
                 simple != null -> types.containsSimple(simple)
                 else -> false
             }
-            if (!known) continue
-            // Resolution is deferred to click time so streaming output is never blocked by PSI index queries
-            // on the terminal emulator thread. The link navigates only if the name resolves to a real class.
-            val link = yoloHyperlink(project) {
-                val target = if (qualified != null) {
-                    resolveQualifiedClass(project, qualified)
-                } else if (simple != null) {
-                    resolveSimpleClass(project, simple)
-                } else {
-                    null
+            if (known) {
+                // Resolution is deferred to click time so streaming output is never blocked by PSI index queries
+                // on the terminal emulator thread. The link navigates only if the name resolves to a real class.
+                val link = yoloHyperlink(project) {
+                    if (project != null) {
+                        val target = if (qualified != null) {
+                            resolveQualifiedClass(project, qualified)
+                        } else if (simple != null) {
+                            resolveSimpleClass(project, simple)
+                        } else {
+                            null
+                        }
+                        if (target != null) openElementAt(project, target)
+                    }
                 }
-                if (target != null) openElementAt(project, target)
+                items.add(LinkResultItem(matcher.start(), matcher.end(), link))
+                continue
             }
-            items.add(LinkResultItem(matcher.start(), matcher.end(), link))
+            // File-name fallback: a bare source-file base name that is not a class (e.g. a Kotlin file facade
+            // like `YoloNavigation`). Linked to the source file so it is clickable too.
+            if (simple != null && types.containsFile(simple)) {
+                val link = yoloHyperlink(project) {
+                    if (project != null) {
+                        val vf = resolveSourceFile(project, simple)
+                        if (vf != null) openFileAt(project, File(vf.path), null, null)
+                    }
+                }
+                items.add(LinkResultItem(matcher.start(), matcher.end(), link))
+            }
         }
         return if (items.isEmpty()) null else LinkResult(items)
     }

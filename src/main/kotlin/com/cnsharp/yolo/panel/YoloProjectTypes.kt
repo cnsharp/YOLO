@@ -32,9 +32,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 object YoloProjectTypes {
 
     /** Immutable view of the project's type names; cheap to hold and query within a single line scan. */
-    data class Snapshot(val simple: Set<String>, val qualified: Set<String>) {
+    data class Snapshot(
+        val simple: Set<String>,
+        val qualified: Set<String>,
+        val files: Set<String> = emptySet(),
+    ) {
         fun containsSimple(name: String): Boolean = name in simple
         fun containsQualified(name: String): Boolean = name in qualified
+        fun containsFile(name: String): Boolean = name in files
     }
 
     private class Cache {
@@ -94,6 +99,17 @@ object YoloProjectTypes {
                 cls.qualifiedName?.let { qualified.add(it) }
             }
         }
-        return Snapshot(simple, qualified)
+        // Source-file base names (without extension), so Kotlin file facades — files of top-level functions
+        // with no enclosing class (e.g. `YoloNavigation.kt`) — are still recognized as project references and
+        // can be linked to the file. Restricted to content roots, matching the class collection above.
+        val files = mutableSetOf<String>()
+        inProject.iterateContent { vf ->
+            if (!vf.isDirectory) {
+                val ext = vf.extension
+                if (ext == "kt" || ext == "java") vf.nameWithoutExtension?.let { files.add(it) }
+            }
+            true
+        }
+        return Snapshot(simple, qualified, files)
     }
 }

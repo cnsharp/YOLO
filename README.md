@@ -8,7 +8,6 @@ and URLs all turn into navigation links — so you can jump from the agent's out
 It is built entirely on **public IntelliJ APIs**, so it passes JetBrains Marketplace verification and can be published
 like any normal plugin. It does **not** hook into or depend on IDEA's Terminal plugin.
 
-![yolo-panel.png](screenshots/yolo-panel.png)
 
 ---
 
@@ -16,12 +15,13 @@ like any normal plugin. It does **not** hook into or depend on IDEA's Terminal p
 
 ### The YOLO panel
 
+![yolo-panel.png](screenshots/yolo-panel.png)
+
 A tool window (right side, **y** icon) that replicates the Terminal's **AI Agents** experience without touching
 any internal Terminal API:
 
 - Lists your **installed** agents — promoted agents (Claude Code, Codex, CodeBuddy, …) plus your own custom tools.
   Agents that aren't detected on `PATH` simply aren't shown, so the list stays relevant to this machine.
-- **Claude Code** and **Codex** are pinned at the top of the list.
 - Each row shows the agent's icon, name, and its configured skip flag.
 - The dropdown loads **instantly from a cached install scan** — the detection done on a previous run is reused, and a
   background re-scan refreshes the list only when the set of installed agents actually changes.
@@ -29,11 +29,13 @@ any internal Terminal API:
 
 ### YOLO mode
 
+![yolo-mode.png](screenshots/yolo-mode.png)
+
 A **YOLO (Skip Permissions)** toggle in the panel header. Turn it on and the next launch starts the agent with its
 permission-bypass flag appended — `--dangerously-skip-permissions` for Claude Code, `--yolo` for Codex, `-y` for
 CodeBuddy, and so on.
 
-The flag is **per agent** and fully configurable. The plugin knows the correct flag for 17 common agents and
+The flag is **per agent** and fully configurable. The plugin knows the correct flag for 16 common agents and
 pre-fills it, but every value is editable and nothing is hardcoded at runtime. A few agents (Goose) bypass via an
 environment variable instead of a flag; those are handled too.
 
@@ -116,7 +118,9 @@ localIdeaPath=/Applications/IntelliJ IDEA.app
 
 ## Installation
 
-**From the Marketplace** — search for **YOLO: AI Agents Extender** in *Settings | Plugins* and install.
+**From the Marketplace** — search for **YOLO** in *Settings | Plugins* and install.
+
+or from website: [https://plugins.jetbrains.com/plugin/33442-yolo-ai-agents-extender/](https://plugins.jetbrains.com/plugin/33442-yolo-ai-agents-extender/)
 
 **From disk** — build or download the `yolo-<version>.zip` (see [Build](#build)), then
 `Settings | Plugins | ⚙ | Install Plugin from Disk…` and pick the zip. Restart when prompted.
@@ -139,7 +143,6 @@ Everything lives in one table. Each row is an agent, and each row carries its ow
 | Command | Executable name — must resolve on `PATH` |
 | Base args | Arguments always passed, space separated |
 | Skip flag | The permission-bypass argument, appended when the YOLO toggle is on |
-| Icon file / URL | A local image or `http(s)` URL — custom tools only |
 
 Rows come in two kinds, listed in descending priority:
 

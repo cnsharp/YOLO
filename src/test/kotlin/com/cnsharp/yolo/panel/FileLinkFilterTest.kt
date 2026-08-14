@@ -147,4 +147,46 @@ class FileLinkFilterTest {
         // A genuine `.m` (Objective-C) file must still link — the boundary only rejects *prefix* matches.
         assertEquals(listOf("src/main/Foo.m"), linked("see src/main/Foo.m here"))
     }
+
+    // ---- Supplementary cases: branches not covered above ----
+
+    @Test
+    fun testPathWithLineRange() {
+        // A `path:start-end` range (e.g. a diff hunk) links the whole reference and opens at the start line.
+        assertEquals(listOf("src/main/Foo.kt:12-20"), linked("changed src/main/Foo.kt:12-20"))
+    }
+
+    @Test
+    fun testQuotedPathWithLineAndColumn() {
+        // A quoted path with embedded spaces may carry `:line:column` outside the closing quote. The path
+        // and the `:line:col` are two separate (quote-excluding) links; the closing quote is never clickable.
+        assertEquals(
+            listOf("/path with space/Bar.kt", ":42:13"),
+            linked("""open "/path with space/Bar.kt":42:13 now"""),
+        )
+    }
+
+    @Test
+    fun testQuotedPathTruncatedNotLinked() {
+        // A quoted path the agent abbreviated with `…` mid-way is incomplete and must not link (the
+        // `raw.contains('…')` guard in the quoted loop).
+        assertTrue(linked("""open "/Users/me/Proj…name/Bar.kt" end""").isEmpty())
+    }
+
+    @Test
+    fun testWindowsPathWithLineAndColumn() {
+        assertEquals(listOf("""C:\foo\Bar.kt:42:13"""), linked("""error at C:\foo\Bar.kt:42:13"""))
+    }
+
+    @Test
+    fun testHomePathWithLine() {
+        // A `~`-prefixed (home-relative) path with a line reference must link.
+        assertEquals(listOf("~/foo/Bar.kt:3"), linked("edit ~/foo/Bar.kt:3 please"))
+    }
+
+    @Test
+    fun testMultiplePathsInOneLine() {
+        // Two independent references on one line each become their own link.
+        assertEquals(listOf("src/a/Foo.kt", "src/b/Bar.java"), linked("edit src/a/Foo.kt and src/b/Bar.java"))
+    }
 }

@@ -57,9 +57,14 @@ class FileLinkFilter(
                 val p = project ?: return@yoloHyperlink
                 openFileAt(p, file, line, column)
             }
-            // Span the path (group 2) only — `q.end()` includes the closing quote, which must not be
-            // clickable. A `:line` reference (outside the closing quote) is still included.
-            items.add(LinkResultItem(q.start(2), q.end() - 1, link))
+            // Span the path (group 2) only — the quotes must not be clickable. When a `:line[:col]` follows
+            // the closing quote (group 3), add it as a *second* link so the whole reference is clickable
+            // without ever painting the quotes blue. A single span cannot skip the quote in the middle, so
+            // the previous `q.end() - 1` trick wrongly dropped the last column digit on `":line:col"`.
+            items.add(LinkResultItem(q.start(2), q.end(2), link))
+            if (q.group(3) != null) {
+                items.add(LinkResultItem(q.start(3) - 1, q.end(), link))
+            }
             quotedSpans.add(q.start() to q.end())
         }
 
