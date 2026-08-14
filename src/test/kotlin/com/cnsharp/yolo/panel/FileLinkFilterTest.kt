@@ -76,6 +76,20 @@ class FileLinkFilterTest {
     }
 
     @Test
+    fun testTruncatedMiddleEllipsisTailIsNotLinked() {
+        // A path abbreviated with `…` in the middle: the fragment after the marker is the tail of a
+        // truncated path, not a real file, so neither the head (`com/cnshar`) nor the tail
+        // (`entExtenderConfigurable.kt`) may link.
+        assertTrue(linked("Read(src/main/kotlin/com/cnshar…entExtenderConfigurable.kt)").isEmpty())
+    }
+
+    @Test
+    fun testTruncatedMiddleEllipsisWithFurtherPathIsNotLinked() {
+        // The tail can itself be a longer path (slash right after `…`); it must still not link.
+        assertTrue(linked("open src/main/kotlin/com/cnshar…/real/AgentExtenderConfigurable.kt end").isEmpty())
+    }
+
+    @Test
     fun testCjkSentenceLinksOnlyThePath() {
         assertEquals(listOf("src/main/Foo.kt"), linked("扫描src/main/Foo.kt失效的key"))
     }

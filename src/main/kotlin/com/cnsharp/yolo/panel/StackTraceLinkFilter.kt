@@ -26,11 +26,16 @@ import java.util.regex.Pattern
  * A bare file name is resolved by searching the project's content roots and the filename index, so it
  * opens the right file even when only the base name is printed. Clicking hides the YOLO pane.
  *
+ * A bare file name is **not** linked when it is the tail of a truncated path — i.e. immediately preceded
+ * by a `…`/`...` abbreviation marker (e.g. `Read(src/main/kotlin/com/cnshar…entExtenderConfigurable.kt)`).
+ * The agent only omitted the middle of the path; the fragment after the marker is not a file on its own,
+ * so it must not become a clickable (and wrong) link. See [isTruncatedPathHead] in [YoloLinkPatterns].
+ *
  * Public APIs only: JediTerm's [HyperlinkFilter] for the link and IntelliJ's [FilenameIndex] /
  * [com.intellij.openapi.fileEditor.OpenFileDescriptor] for resolution/navigation.
  */
 class StackTraceLinkFilter(
-    private val project: Project,
+    private val project: Project?,
     private val baseDir: String
 ) : HyperlinkFilter {
 
@@ -42,13 +47,19 @@ class StackTraceLinkFilter(
             var guard = 0
             while (matcher.find() && guard++ < MAX_MATCHES_PER_LINE) {
                 val raw = matcher.group(spec.fileGroup)
+                // A `…`/`...` truncation marker immediately before the file name means this match is the tail
+                // of a truncated path (e.g. `Read(src/main/kotlin/com/cnshar…entExtenderConfigurable.kt)`),
+                // not a real bare-file reference — don't link it. The agent only abbreviated the path; the
+                // fragment after the marker is not a file on its own.
+                if (isTruncatedPathHead(text, matcher.start(spec.fileGroup))) continue
                 val line = if (spec.lineGroup >= 0) matcher.group(spec.lineGroup)?.toIntOrNull() else null
                 val column = if (spec.colGroup >= 0) matcher.group(spec.colGroup)?.toIntOrNull() else null
                 // Resolution (FilenameIndex / content roots) is deferred to click time so streaming output is
                 // never blocked by index queries on the terminal emulator thread.
                 val link = yoloHyperlink(project) {
                     val file = resolve(raw) ?: return@yoloHyperlink
-                    openFileAt(project, file, line, column)
+                    val p = project ?: return@yoloHyperlink
+                    openFileAt(p, file, line, column)
                 }
                 items.add(LinkResultItem(matcher.start(), matcher.end(), link))
             }
@@ -62,19 +73,24 @@ class StackTraceLinkFilter(
     private fun resolve(raw: String): File? = ReadAction.compute<File?, Throwable> {
         val base = File(baseDir, raw)
         if (base.isFile) return@compute base
-        for (root in ProjectRootManager.getInstance(project).contentRoots) {
-            val f = File(root.path, raw)
-            if (f.isFile) return@compute f
+        // Content-root + filename-index resolution needs a live project; without one (e.g. offline unit
+        // tests) we still resolve against the working dir and absolute paths below.
+        val project = this.project
+        if (project != null) {
+            for (root in ProjectRootManager.getInstance(project).contentRoots) {
+                val f = File(root.path, raw)
+                if (f.isFile) return@compute f
+            }
+            // Bare file name: find by name across the project's indexed files.
+            if (!raw.contains('/') && !raw.contains('\\')) {
+                for (vf in FilenameIndex.getVirtualFilesByName(raw, GlobalSearchScope.projectScope(project))) {
+                    if (!vf.isDirectory) return@compute File(vf.path)
+                }
+            }
         }
         // Absolute / already-rooted path.
         val abs = File(raw)
         if (abs.isFile) return@compute abs
-        // Bare file name: find by name across the project's indexed files.
-        if (!raw.contains('/') && !raw.contains('\\')) {
-            for (vf in FilenameIndex.getVirtualFilesByName(raw, GlobalSearchScope.projectScope(project))) {
-                if (!vf.isDirectory) return@compute File(vf.path)
-            }
-        }
         null
     }
 

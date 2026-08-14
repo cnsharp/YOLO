@@ -145,3 +145,16 @@ internal val MEMBER_REF_PATTERN: Pattern = Pattern.compile(
 
 /** `http(s)://` URLs (no trailing whitespace/quote/bracket). Drives [com.cnsharp.yolo.panel.UrlLinkFilter]. */
 internal val URL_PATTERN: Pattern = Pattern.compile("""https?://[^\s<>"'\)\]]+""")
+
+/**
+ * True when the file reference at [fileStart] is the *tail* of a truncated path — i.e. the character(s)
+ * immediately before it are a `…` (U+2026) or a `...` run. Agents abbreviate long paths with `…` in the
+ * middle (e.g. `Read(src/main/kotlin/com/cnshar…entExtenderConfigurable.kt)`); the fragment after the
+ * marker is not a real file, so it must not be linked. The path component class is ASCII-safe, so `…`
+ * always lands *just before* the captured fragment and must be checked here.
+ */
+internal fun isTruncatedPathHead(text: String, fileStart: Int): Boolean {
+    if (fileStart < 1) return false
+    val c = text[fileStart - 1]
+    return c == '…' || (c == '.' && text.startsWith("...", fileStart - 3))
+}

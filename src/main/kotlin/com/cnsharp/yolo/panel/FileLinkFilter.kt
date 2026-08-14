@@ -19,6 +19,15 @@ import java.io.File
  * exists in the project (or the agent's working dir / a content root), the reference becomes a hyperlink
  * that opens it in the IDE editor; clicking also hides the YOLO pane.
  *
+ * A reference is only linked when it resolves to a real file *at match time* — see [exists]. This stops
+ * the panel from painting clickable links for paths the agent printed incorrectly (e.g. a wrong directory
+ * component), which would otherwise be dead links that navigate nowhere. The existence check is a cheap
+ * filesystem `isFile` (no PSI/index query, no read action), so it never blocks the terminal emulator
+ * thread; the heavier index/PSI resolution for navigation still happens on click in [resolve].
+ *
+ * A reference that is a fragment of a truncated path (e.g. `…` in the middle) is never linked — see the
+ * truncation guards in [apply] and [StackTraceLinkFilter].
+ *
  * Built entirely on public APIs: JediTerm's [HyperlinkFilter] / [LinkInfo] for the terminal link, and
  * IntelliJ's [com.intellij.openapi.fileEditor.OpenFileDescriptor] / [com.intellij.openapi.fileEditor.FileEditorManager]
  * for navigation — so it stays Marketplace-safe.
@@ -59,6 +68,10 @@ class FileLinkFilter(
         while (m.find()) {
             // Skip a match that lies inside a quoted path (see quotedSpans above).
             if (quotedSpans.any { m.start(1) < it.second && m.end() > it.first }) continue
+            // Skip the tail of a truncated path: a `…`/`...` immediately before the path start (e.g.
+            // `Read(src/main/kotlin/com/cnshar…/real/Bar.kt)`). The agent only abbreviated the middle, so
+            // the fragment after the marker is not a real file.
+            if (isTruncatedPathHead(text, m.start(1))) continue
             val raw = m.group(1)
             val hasExt = m.group(2) != null
             val hasLine = m.group(3) != null
