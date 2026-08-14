@@ -15,8 +15,10 @@ import javax.swing.Icon
  *   2. Official icon bundled with the plugin (matched to BUNDLED by agent id)
  *   3. Generic icon DEFAULT
  *
- * Bundled icon naming follows the terminal built-in convention: `<name>.svg` + `<name>_dark.svg`,
- * IconLoader automatically selects the _dark variant based on the current theme. Uniform size 16x16.
+ * Bundled icons are theme-agnostic (no `_dark` variant) — the agent logos read fine on both light and
+ * dark themes. The only exception is the "y" mark used by the Skip-permissions checkbox, which keeps a
+ * `_dark` variant (`skipY_dark.svg` / `skipYOn_dark.svg`) and is selected automatically by IconLoader.
+ * Uniform size 16x16.
  */
 object AgentIcons {
 
@@ -27,7 +29,7 @@ object AgentIcons {
 
     /** Official icons bundled with the plugin: agent id -> classpath resource path. */
     private val BUNDLED: Map<String, String> = mapOf(
-        "claude"    to "/icons/agents/claude.svg",
+        "claude"    to "/icons/agents/claude.png",
         "codex"     to "/icons/agents/codex.svg",
         "codebuddy" to "/icons/agents/codebuddy.svg",
         "gemini"    to "/icons/agents/gemini.png",
