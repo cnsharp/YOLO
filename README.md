@@ -127,6 +127,48 @@ or from website: [https://plugins.jetbrains.com/plugin/33442-yolo-ai-agents-exte
 
 ---
 
+## Experimental edition (`exp` branch)
+
+The `exp` branch is an **alternative, experimental build** of this plugin with a different architecture.
+Rather than the standalone YOLO panel (this `main` line), it **extends IDEA's built-in Terminal
+"AI Agents" dropdown** directly — appending your own CLI tools to that menu and adding a "Skip
+permissions" (YOLO) toggle to the Terminal toolbar.
+
+It is "experimental" because it hooks **internal** Terminal extension points
+(`terminalAgentProvider`, `shellExecOptionsCustomizer`, `toolWindowInitializer` from
+`org.jetbrains.plugins.terminal`), which are still `@ApiStatus.Internal` and have no public alternative.
+
+### Trade-offs vs. the main edition
+
+| | Main (`main`) | Experimental (`exp`) |
+|---|---|---|
+| Integration | Standalone YOLO panel + embedded terminal | IDEA Terminal's AI Agents dropdown |
+| Clickable agent output | Yes — file / stack-trace / type / URL links | No (the link filters are not included) |
+| APIs used | Public IntelliJ APIs only | Internal Terminal APIs |
+| Marketplace | Published | **Not published** (fails verification) |
+| Min. IDE version | 2023.3 (`233`) | 2026.1 (`261`) |
+| IDE family | All IntelliJ-platform IDEs | IntelliJ IDEA (Terminal plugin required) |
+
+### How to get it
+
+Because it depends on internal APIs, the experimental edition is **rejected by JetBrains Marketplace
+verification**, so it is distributed from the repository's **Releases** page instead:
+
+1. Check out the `exp` branch and build it:
+   ```bash
+   git checkout exp
+   ./gradlew buildPlugin
+   # → build/distributions/yolo-<version>.zip
+   ```
+2. Download the zip from the repo's **Releases** page, or use the one you just built.
+3. Install via `Settings | Plugins | ⚙ | Install Plugin from Disk…` and restart.
+
+> Requires **IntelliJ IDEA 2026.1 or later** (`since-build 261`) with the bundled **Terminal** plugin
+
+This branch is a divergence for experimentation; the published, supported line remains `main`.
+
+---
+
 ## Configuration
 
 **`Settings | Tools | YOLO: AI Agents Extender`** — or click the gear in the YOLO panel header.
