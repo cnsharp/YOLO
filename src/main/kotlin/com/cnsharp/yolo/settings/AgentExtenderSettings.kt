@@ -25,12 +25,10 @@ data class CustomTool(
     var iconPath: String = ""
 )
 
-/** Default skip-permission flags per agent (convenience prefill only; IDEA itself does not expose this info).
- *  Agents not in the table are not auto-prefilled; the user adds them manually in the permission rules table. */
+    /** Default skip-permission flags per agent (convenience prefill only; IDEA itself does not expose this info).
+     *  Agents not in the table are not auto-prefilled; the user adds them manually in the permission rules table. */
 object DefaultSkipFlags {
     private val map: Map<String, String> = mapOf(
-        // IDEA built-in agents
-        "junie"     to "--dangerously-skip-permissions",
         "claude"    to "--dangerously-skip-permissions",
         "codex"     to "--yolo",
         // Promoted / custom agents with a launch-time permission-bypass flag
