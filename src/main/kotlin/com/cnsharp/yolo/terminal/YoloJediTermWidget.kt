@@ -6,19 +6,28 @@ import com.jediterm.terminal.model.TerminalTextBuffer
 import com.jediterm.terminal.ui.JediTermWidget
 import com.jediterm.terminal.ui.TerminalPanel
 import com.jediterm.terminal.ui.settings.SettingsProvider
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
 
 /**
- * A [JediTermWidget] subclass whose terminal panel exposes [reinitFontAndResize] so the YOLO panel can
- * force JediTerm to recompute its grid after a layout settle or a scale change.
+ * A [JediTermWidget] subclass whose terminal panel forces JediTerm to recompute its grid once, at the
+ * right moment, so the embedded terminal comes up crisp and correctly sized.
  *
- * Two flavors are exposed:
- *  - [YoloTerminalPanel.forceReinit] — resize-only: recompute the character grid with JediTerm's *own*
- *    cell math (`getTerminalSizeFromComponent` + `onResize`). This clears the ghost/duplicate glyphs that
- *    appear when the cached image goes out of sync with the component size, but does NOT re-derive the
- *    font. Re-running `initFont()` on every resize re-creates the `java.awt.Font` and blurs it on HiDPI
- *    displays, so we avoid that on the frequent horizontal-resize path.
- *  - [YoloTerminalPanel.forceReinitFull] — font + grid (`reinitFontAndResize`). Only needed when the OS
- *    display scale / DPI changes, where the font itself must be re-derived to stay crisp.
+ * JediTerm's own [TerminalPanel] already handles ongoing resizes correctly and blur-free: its built-in
+ * `componentResized` listener calls `sizeTerminalFromComponent()`, which recomputes the character grid
+ * WITHOUT re-deriving the font (so HiDPI text stays sharp) and recreates the backing image via
+ * `postResize` (so no ghost/duplicate glyphs). We must NOT add our own resize listener on top of that —
+ * doing so double-fires and makes the panel laggy.
+ *
+ * The one thing JediTerm does not give us for free is a clean *initial* grid. When the panel is first
+ * constructed its size is still zero, so the first size sync (triggered by JediTerm's hierarchy listener)
+ * can land before the component is laid out, leaving the TUI garbled. So we attach a one-shot
+ * `componentResized` listener that runs [reinitFontAndResize] exactly once, the first time the panel
+ * actually has a real (non-zero) size. That single call establishes the font metrics and the grid at the
+ * correct dimensions; every resize after that is handled by JediTerm itself.
+ *
+ * For OS display-scale / DPI changes (where the component's pixel size may not change and JediTerm never
+ * recomputes), [YoloTerminalPanel.forceReinitFull] re-derives the font via [YoloJediTermWidget.forceReinitFull].
  */
 class YoloJediTermWidget(settings: SettingsProvider) : JediTermWidget(settings) {
 
@@ -28,11 +37,6 @@ class YoloJediTermWidget(settings: SettingsProvider) : JediTermWidget(settings) 
         buffer: TerminalTextBuffer
     ): TerminalPanel = YoloTerminalPanel(settings, buffer, style)
 
-    /** Resize-only recompute (clears ghosts without re-deriving the font — avoids HiDPI blur on resize). */
-    fun forceReinit() {
-        (myTerminalPanel as? YoloTerminalPanel)?.forceReinit()
-    }
-
     /** Full font + grid recompute, for OS display-scale / DPI changes. */
     fun forceReinitFull() {
         (myTerminalPanel as? YoloTerminalPanel)?.forceReinitFull()
@@ -40,9 +44,7 @@ class YoloJediTermWidget(settings: SettingsProvider) : JediTermWidget(settings) 
 }
 
 /**
- * Exposes JediTerm's protected [reinitFontAndResize] plus a resize-only variant. The base method is
- * `protected` and recreates the backing image using JediTerm's internal character-size calculation
- * (char width from 'W', height from font metrics + line spacing).
+ * Exposes JediTerm's protected [reinitFontAndResize] plus a one-shot initial recompute.
  */
 class YoloTerminalPanel(
     settings: SettingsProvider,
@@ -50,16 +52,25 @@ class YoloTerminalPanel(
     style: StyleState
 ) : TerminalPanel(settings, buffer, style) {
 
-    /** Resize-only: recompute the grid from the component size using JediTerm's own cell math, then resize.
-     *  Skips [reinitFontAndResize]'s `initFont()` step so the font is not re-derived (and thus not blurred)
-     *  on every horizontal resize. */
-    fun forceReinit() {
-        val size = getTerminalSizeFromComponent() ?: return
-        onResize(size, RequestOrigin.User)
+    private var initialReinitDone = false
+
+    init {
+        // One-shot: the first time this panel reaches a real (non-zero) size, recompute the font metrics
+        // and the character grid. This must happen after layout has settled — a premature call (e.g. from
+        // an invokeLater that runs before the component is sized) computes a wrong grid and garbles the TUI.
+        // After this single call, JediTerm's own resize handling takes over for every subsequent resize.
+        addComponentListener(object : ComponentAdapter() {
+            override fun componentResized(e: ComponentEvent) {
+                if (initialReinitDone) return
+                if (width <= 0 || height <= 0) return
+                initialReinitDone = true
+                runCatching { reinitFontAndResize() }
+            }
+        })
     }
 
-    /** Full font + grid recompute. */
+    /** Full font + grid recompute (also used for OS display-scale / DPI changes). */
     fun forceReinitFull() {
-        reinitFontAndResize()
+        runCatching { reinitFontAndResize() }
     }
 }

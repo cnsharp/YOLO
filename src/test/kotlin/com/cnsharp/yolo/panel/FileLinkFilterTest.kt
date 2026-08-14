@@ -105,4 +105,32 @@ class FileLinkFilterTest {
     fun testQuotedPathWithSpaces() {
         assertEquals(listOf("/path with space/Bar.kt"), linked("""open "/path with space/Bar.kt" now"""))
     }
+
+    @Test
+    fun testExtensionIsNotTruncatedToPrefix() {
+        // A listed extension must match as a *full* extension, never as a prefix of a longer one.
+        // Regression: the regex grabbed the first listed extension it could — `.markdown` linked only
+        // `Foo.m`, `.kts` linked only `Foo.kt`, `.json5` only `Foo.json`. These all have a longer
+        // recognized extension, so the whole name must link.
+        assertEquals(listOf("src/main/Foo.markdown"), linked("cat src/main/Foo.markdown please"))
+        assertEquals(listOf("src/main/Foo.kts"), linked("see src/main/Foo.kts here"))
+        assertEquals(listOf("src/main/Foo.json5"), linked("open src/main/Foo.json5 end"))
+        assertEquals(listOf("src/main/Foo.mjs"), linked("view src/main/Foo.mjs end"))
+    }
+
+    @Test
+    fun testUnrecognizedExtensionIsNotLinked() {
+        // Extensions that merely *contain* a listed one as a prefix but are not themselves recognized
+        // (.module, .commit, .mlis, .more) must not link — and must not be truncated to a wrong file.
+        assertTrue(linked("see src/main/Foo.module here").isEmpty())
+        assertTrue(linked("edit src/main/Bar.commit now").isEmpty())
+        assertTrue(linked("open src/main/Baz.mlis end").isEmpty())
+        assertTrue(linked("view src/main/MyClass.more end").isEmpty())
+    }
+
+    @Test
+    fun testRealSingleCharExtensionStillLinks() {
+        // A genuine `.m` (Objective-C) file must still link — the boundary only rejects *prefix* matches.
+        assertEquals(listOf("src/main/Foo.m"), linked("see src/main/Foo.m here"))
+    }
 }

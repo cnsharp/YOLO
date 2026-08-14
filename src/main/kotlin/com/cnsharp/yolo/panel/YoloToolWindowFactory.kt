@@ -45,8 +45,6 @@ import java.awt.Font
 import java.awt.Rectangle
 import java.awt.KeyboardFocusManager
 import java.awt.Toolkit
-import java.awt.event.ComponentAdapter
-import java.awt.event.ComponentEvent
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.beans.PropertyChangeListener
@@ -436,36 +434,19 @@ private class YoloPanel(
         terminalHolder.removeAll()
         terminalHolder.add(widget, BorderLayout.CENTER)
 
-        // JediTerm caches a backing image sized to the component; on a resize the grid can go stale and
-        // leave ghost glyphs. Recompute JediTerm's own grid (its internal character-size math) on every
-        // resize — this clears ghosts without re-deriving the font (which would blur it on HiDPI). A full
-        // font+grid recompute is reserved for OS display-scale changes (see scaleChangeListener).
-        widget.addComponentListener(object : ComponentAdapter() {
-            override fun componentResized(e: ComponentEvent) {
-                forceReinit(widget)
-            }
-        })
+        // JediTerm's own TerminalPanel handles ongoing resizes itself: its built-in `componentResized`
+        // listener recomputes the grid (sizeTerminalFromComponent) without re-deriving the font — so text
+        // stays sharp on HiDPI — and recreates the backing image via postResize, so no ghost glyphs. We do
+        // NOT add a second resize listener: doing so double-fires and makes the panel laggy.
+        //
+        // The only thing we drive manually is the *initial* grid, which YoloTerminalPanel recomputes once
+        // the first time it reaches a real (non-zero) size. OS display-scale changes are handled by
+        // forceReinitFull() via the scaleChangeListener above.
         terminalHolder.revalidate()
         terminalHolder.repaint()
-        SwingUtilities.invokeLater { forceReinit(widget) }
 
         currentWidget = widget
         currentProcess = process
-    }
-
-    /**
-     * Resize-only recompute of the embedded terminal's grid from the panel's current size. Clears
-     * ghost/duplicate glyphs that appear when JediTerm's cached image goes out of sync with the actual
-     * component size, without re-deriving the font (which would blur it on HiDPI). Full font+grid
-     * recompute on display-scale changes goes through [YoloJediTermWidget.forceReinitFull] instead.
-     */
-    private fun forceReinit(widget: YoloJediTermWidget?) {
-        if (widget == null) return
-        try {
-            widget.forceReinit()
-        } catch (e: Exception) {
-            LOG.warn("AI Agents Extender: failed to reinit embedded terminal", e)
-        }
     }
 
     override fun dispose() {

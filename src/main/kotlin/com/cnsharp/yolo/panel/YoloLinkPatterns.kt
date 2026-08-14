@@ -58,6 +58,12 @@ internal val PROGRAMMING_EXT: String = buildList {
  * `…/WEB-INF/cla`) has neither an extension nor a line number, so it is skipped; only a fragment that
  * still looks like a complete file links.
  *
+ * **Trailing extension boundary:** the extension is followed by a negative lookahead `(?![\\/\w.])` so a
+ * listed extension only matches as a *full* extension, never as a prefix of a longer one. Without it the
+ * regex would greedily grab the first listed extension it can — e.g. `.markdown` would match `.m`,
+ * `.module` → `.m`, `.commit` → `.c` — truncating the link at `.m` and pointing at a non-existent file.
+ * A `:`line reference is still allowed after the extension (`:` is not in the boundary class).
+ *
  * The component character class is ASCII-safe (`[A-Za-z0-9._\-]+`): any non-ASCII script naturally
  * *terminates* the path instead of being absorbed, so a sentence like `扫描src/main/Foo.kt失效的key` links
  * only `src/main/Foo.kt` and never the surrounding prose, for every language. (Trade-off: a name containing
@@ -66,7 +72,7 @@ internal val PROGRAMMING_EXT: String = buildList {
  * **Groups:** 1 = full path (without extension), 2 = extension, 3 = line, 4 = range end, 5 = column.
  */
 internal val PATH_PATTERN: Pattern = Pattern.compile(
-    """(?<![\\/\w.])((?:(?:[A-Za-z]:[\\/]?)|[\\/]|[~][\\/]?|\\\\[A-Za-z0-9._\-]+(?:[\\/][A-Za-z0-9._\-]+)+|[A-Za-z0-9._\-]+[\\/])(?:[A-Za-z0-9._\-]+[\\/])*(?:[A-Za-z0-9._\-]+\.((?i:$PROGRAMMING_EXT))|[A-Za-z0-9._\-]+))(?::(\d+)(?:-(\d+))?(?::(\d+))?)?"""
+    """(?<![\\/\w.])((?:(?:[A-Za-z]:[\\/]?)|[\\/]|[~][\\/]?|\\\\[A-Za-z0-9._\-]+(?:[\\/][A-Za-z0-9._\-]+)+|[A-Za-z0-9._\-]+[\\/])(?:[A-Za-z0-9._\-]+[\\/])*(?:[A-Za-z0-9._\-]+\.((?i:$PROGRAMMING_EXT))(?![\\/\w.])|[A-Za-z0-9._\-]+))(?::(\d+)(?:-(\d+))?(?::(\d+))?)?"""
 )
 
 /**
