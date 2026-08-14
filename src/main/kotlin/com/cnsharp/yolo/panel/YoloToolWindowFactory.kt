@@ -32,12 +32,15 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.content.ContentFactory
 import com.intellij.util.ui.JBUI
+import com.jediterm.core.util.TermSize
 import com.jediterm.terminal.ProcessTtyConnector
 import com.jediterm.terminal.ui.settings.DefaultSettingsProvider
 import com.jediterm.terminal.TerminalColor
 import com.jediterm.terminal.TextStyle
 import com.jediterm.terminal.emulator.ColorPalette
+import com.pty4j.PtyProcess
 import com.pty4j.PtyProcessBuilder
+import com.pty4j.WinSize
 import com.cnsharp.yolo.terminal.YoloColorPalette
 import com.cnsharp.yolo.terminal.YoloJediTermWidget
 import java.awt.BorderLayout
@@ -386,6 +389,21 @@ private class YoloPanel(
                     .start()
                 val connector = object : ProcessTtyConnector(process, StandardCharsets.UTF_8) {
                     override fun getName(): String = YoloConstants.ID
+
+                    /**
+                     * Push the terminal size to the PTY so the child process (and any interactive TUI it
+                     * spawns) learns the real grid dimensions. JediTerm's [ProcessTtyConnector] does NOT
+                     * override `resize` — its default is a no-op — so without this the PTY winsize stays at
+                     * the OS default (80x24) and is never updated when the panel is resized. The TUI then
+                     * redraws against that stale size: clearing/rewriting lines with wrong cursor math
+                     * produces the ghosting and duplicate lines seen when moving the selection with arrow
+                     * keys. pty4j's [PtyProcess.setWinSize] updates the PTY and raises SIGWINCH, so the TUI
+                     * re-queries and re-renders at the correct width/height.
+                     */
+                    override fun resize(termSize: TermSize) {
+                        val p = getProcess()
+                        if (p is PtyProcess) runCatching { p.setWinSize(WinSize(termSize.columns, termSize.rows)) }
+                    }
                 }
                 ApplicationManager.getApplication().invokeLater {
                     try {
