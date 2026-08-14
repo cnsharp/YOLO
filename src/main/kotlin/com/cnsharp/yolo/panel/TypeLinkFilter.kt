@@ -49,17 +49,13 @@ class TypeLinkFilter(
             }
             if (known) {
                 // Resolution is deferred to click time so streaming output is never blocked by PSI index queries
-                // on the terminal emulator thread. The link navigates only if the name resolves to a real class.
+                // on the terminal emulator thread. The link navigates only if the name resolves to a real type
+                // in some language's contributor.
                 val link = yoloHyperlink(project) {
                     if (project != null) {
-                        val target = if (qualified != null) {
-                            resolveQualifiedClass(project, qualified)
-                        } else if (simple != null) {
-                            resolveSimpleClass(project, simple)
-                        } else {
-                            null
-                        }
-                        if (target != null) openElementAt(project, target)
+                        val name = qualified ?: simple
+                        val target = if (name != null) resolveType(project, name) else null
+                        if (target != null) openNavigationItem(target)
                     }
                 }
                 items.add(LinkResultItem(matcher.start(), matcher.end(), link))
@@ -70,7 +66,7 @@ class TypeLinkFilter(
             if (simple != null && types.containsFile(simple)) {
                 val link = yoloHyperlink(project) {
                     if (project != null) {
-                        val vf = resolveSourceFile(project, simple)
+                        val vf = types.resolveFile(simple)
                         if (vf != null) openFileAt(project, File(vf.path), null, null)
                     }
                 }

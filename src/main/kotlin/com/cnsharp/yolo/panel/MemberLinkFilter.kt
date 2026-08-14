@@ -2,7 +2,6 @@ package com.cnsharp.yolo.panel
 
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
-import com.intellij.psi.PsiElement
 import com.jediterm.terminal.model.hyperlinks.HyperlinkFilter
 import com.jediterm.terminal.model.hyperlinks.LinkInfo
 import com.jediterm.terminal.model.hyperlinks.LinkResult
@@ -12,10 +11,13 @@ import com.jediterm.terminal.model.hyperlinks.LinkResultItem
  * Makes `Class.member` / `Class#member` references clickable, navigating to the specific method, field,
  * or inner class rather than just the enclosing class declaration.
  *
- * Examples: `com.foo.Bar.baz`, `Bar#findById`, `UserRepository.save`. The class part is resolved with the
- * same public PSI APIs used by [TypeLinkFilter] (qualified names across the whole project; simple names
- * only within project content roots). If the member can't be found, the link falls back to the class
- * declaration. Clicking hides the YOLO pane.
+ * Examples: `com.foo.Bar.baz`, `Bar#findById`, `UserRepository.save`, and across languages
+ * `MyApp.Services.UserService.SomeMethod` (C#), `myapp.models.User.save` (Python), `http.Client.Get` (Go).
+ *
+ * Resolution is language-agnostic: the class part is resolved through the `gotoClassContributor` EP (the
+ * same mechanism [TypeLinkFilter] uses), and the member is resolved best-effort through the
+ * `gotoSymbolContributor` EP. If the member can't be pinned down (some non-JVM languages expose members
+ * less precisely than Java), the link falls back to the class declaration. Clicking hides the YOLO pane.
  *
  * Skipped while the index is in dumb mode so it never blocks the terminal.
  */
@@ -32,22 +34,15 @@ class MemberLinkFilter(private val project: Project) : HyperlinkFilter {
         while (matcher.find() && guard++ < MAX_MATCHES_PER_LINE) {
             val classRef = matcher.group("class") ?: continue
             val member = matcher.group("member") ?: continue
-            val known = if (classRef.contains('.')) types.containsQualified(classRef) else types.containsSimple(classRef)
+            val known = if (isQualifiedName(classRef)) types.containsQualified(classRef) else types.containsSimple(classRef)
             if (!known) continue
             // Resolution is deferred to click time so streaming output is never blocked by PSI index queries
             // on the terminal emulator thread. The link navigates only if the class/member resolves.
             val link = yoloHyperlink(project) {
-                val psiClass = if (classRef.contains('.')) {
-                    resolveQualifiedClass(project, classRef)
-                } else {
-                    resolveSimpleClass(project, classRef)
-                } ?: return@yoloHyperlink
-                // Land on the member only when it is declared in the project (incl. a project base class);
-                // an inherited member from a library/JDK class (e.g. CustomerException#getMessage from
-                // Throwable) would otherwise jump into the JDK, so fall back to the referenced class instead.
-                val member = findMember(psiClass, member)
-                val target: PsiElement = if (member != null && isInProjectContent(member, project)) member else psiClass
-                openElementAt(project, target)
+                val classItem = resolveType(project, classRef) ?: return@yoloHyperlink
+                // Try to land on the member; fall back to the class declaration if it can't be pinned down.
+                val memberItem = resolveMember(project, classItem, member)
+                if (memberItem != null) openNavigationItem(memberItem) else openNavigationItem(classItem)
             }
             items.add(LinkResultItem(matcher.start(), matcher.end(), link))
         }

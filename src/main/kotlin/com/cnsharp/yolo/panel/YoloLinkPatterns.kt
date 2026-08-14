@@ -119,28 +119,37 @@ internal val STACK_PY_SQ_PATTERN: Pattern = Pattern.compile(
 )
 
 /**
- * Type references: a qualified name (`com.foo.Bar`, inner classes `com.foo.Bar.Baz`) or a simple
- * capitalized identifier (`Bar`). Neither may be preceded by a word char/dot/path separator, and both
- * exclude a trailing lowercase extension (e.g. `.kt`) so they never collide with file-path links. Drives
- * [com.cnsharp.yolo.panel.TypeLinkFilter].
+ * Type references: a qualified name (`com.foo.Bar`, inner classes `com.foo.Bar.Baz`, C# `MyApp.Services.UserService`,
+ * Rust/Ruby `foo::Bar`, PHP `\App\Models\User`, Python/Go `myapp.models.User` / `http.Client`) or a simple
+ * capitalized identifier (`Bar`). Neither may be preceded by a word char/dot/path separator; a trailing
+ * `.lowercase` is excluded so a member access (`Class.member`) is left for [com.cnsharp.yolo.panel.MemberLinkFilter]
+ * rather than swallowed here. Drives [com.cnsharp.yolo.panel.TypeLinkFilter].
+ *
+ * Qualified segments are joined by `.`, `::`, or `\` — the namespace separators used across languages — so
+ * one pattern covers them all; actual resolution/gating is delegated to [com.cnsharp.yolo.panel.YoloProjectTypes]
+ * + the language-agnostic `gotoClassContributor` EP.
  *
  * **Named groups:** `qualified`, `simple` (mutually exclusive — exactly one is non-null per match).
  */
 internal val TYPE_NAME_PATTERN: Pattern = Pattern.compile(
-    """(?<![.\w/\\])(?<qualified>(?:[a-z][a-zA-Z0-9_]*\.)+(?:[A-Z][a-zA-Z0-9_]*+(?:\.[A-Z][a-zA-Z0-9_]*+)*))(?!\.[a-z])""" +
+    """(?<![.\w/\\])(?<qualified>\\?(?:[A-Za-z_][A-Za-z0-9_]*+)(?:(?:\.|::|\\)[A-Za-z_][A-Za-z0-9_]*+)+)(?!\.[a-z])""" +
         """|(?<![.\w/\\])(?<simple>[A-Z][a-zA-Z0-9_]*+)(?!\.[a-z])"""
 )
 
 /**
  * `Class.member` / `Class#member` references, navigating to the specific method/field/inner class. A class
- * reference (qualified name, or a simple capitalized identifier not preceded by a word/dot) followed by
- * `.`/`#` and a member name; not preceded by a path separator so a path segment like `messages/YoloBundle`
- * is never mistaken for a class. Drives [com.cnsharp.yolo.panel.MemberLinkFilter].
+ * reference (qualified name in any language's namespace convention, or a simple capitalized identifier, not
+ * preceded by a word/dot/path separator) followed by `.`/`#` and a member name; not preceded by a path
+ * separator so a path segment like `messages/YoloBundle` is never mistaken for a class. Drives
+ * [com.cnsharp.yolo.panel.MemberLinkFilter].
+ *
+ * The class part reuses the multi-separator qualified form (`.` / `::` / `\`; any-case segments) so C#
+ * `MyApp.Services.UserService.SomeMethod`, Python `myapp.models.User.save`, etc. are recognized too.
  *
  * **Named groups:** `class`, `member`.
  */
 internal val MEMBER_REF_PATTERN: Pattern = Pattern.compile(
-    """(?<class>(?<![.\w/\\])(?:(?:[a-z][a-zA-Z0-9_]*\.)+(?:[A-Z][a-zA-Z0-9_]*+(?:\.[A-Z][a-zA-Z0-9_]*+)*)|[A-Z][a-zA-Z0-9_]*+))[.#](?<member>(?<![.\w])[A-Za-z_]\w*)"""
+    """(?<class>(?<![.\w/\\])(?:\\?(?:[A-Za-z_][A-Za-z0-9_]*+)(?:(?:\.|::|\\)[A-Za-z_][A-Za-z0-9_]*+)+)|[A-Z][a-zA-Z0-9_]*+)[.#](?<member>(?<![.\w])[A-Za-z_]\w*)"""
 )
 
 /** `http(s)://` URLs (no trailing whitespace/quote/bracket). Drives [com.cnsharp.yolo.panel.UrlLinkFilter]. */

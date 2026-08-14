@@ -47,6 +47,53 @@ intellijPlatform {
             sinceBuild = "233"
         }
     }
+    // Verify the built artifact against the whole IntelliJ-platform family, not just IDEA. The panel
+    // installs on every one of these (it depends only on the lang module, present everywhere). Run
+    // explicitly via `./gradlew verifyPlugin` — this task is NOT part of the default `build`.
+    // `pluginVerification` is a member of `IntelliJPlatformExtension` (a sibling of `pluginConfiguration`),
+    // so it must live directly inside `intellijPlatform { }`, not nested in `pluginConfiguration { }`.
+    // The verifier's `Ides` block supports `create(type, version)` but not `recommended()`, so each
+    // target IDE is listed explicitly.
+    pluginVerification {
+        ides {
+            create(IntelliJPlatformType.PyCharmCommunity, "2023.3")
+            create(IntelliJPlatformType.GoLand, "2023.3")
+            create(IntelliJPlatformType.WebStorm, "2023.3")
+            create(IntelliJPlatformType.RubyMine, "2023.3")
+            create(IntelliJPlatformType.PhpStorm, "2023.3")
+            create(IntelliJPlatformType.CLion, "2023.3")
+            create(IntelliJPlatformType.DataGrip, "2023.3")
+            create(IntelliJPlatformType.RustRover, "2023.3")
+            create(IntelliJPlatformType.Rider, "2023.3")
+        }
+    }
+}
+
+// Run the plugin inside other IDEs to manually confirm type-name / Class.member links work per language.
+// Each task downloads its IDE on first run; pass `localPath = file("/Applications/X.app")` to skip the
+// download when that IDE is already installed locally.
+intellijPlatformTesting {
+    runIde {
+        register("pyCharm") {
+            type = IntelliJPlatformType.PyCharmCommunity
+            version = "2023.3"
+        }
+        register("goLand") {
+            type = IntelliJPlatformType.GoLand
+            version = "2023.3"
+        }
+        register("webStorm") {
+            type = IntelliJPlatformType.WebStorm
+            version = "2023.3"
+        }
+        register("rider") {
+            type = IntelliJPlatformType.Rider
+            version = "2023.3"
+            // Use the locally installed Rider (offline, no download) — set in Task 2 for manual C#/Rider
+            // link testing. When localPath is present it overrides `version` for which IDE is launched.
+            localPath = file("/Applications/Rider.app")
+        }
+    }
 }
 
 repositories {
@@ -76,13 +123,12 @@ dependencies {
         if (localIdeaPath != null) {
             local(file(localIdeaPath))
         } else {
-            // Use Ultimate to match the local dev environment. Build against the oldest supported version
-            // (2023.3) so an accidental use of a newer-only API fails here instead of at Marketplace review.
-            create(IntelliJPlatformType.IntellijIdeaUltimate, "2023.3")
+            // Build against the oldest supported version (2023.3) on Community so an accidental use of a
+            // newer-only or Ultimate-only API fails here instead of at Marketplace review. The panel no
+            // longer depends on the Java plugin (type-name navigation goes through the language-agnostic
+            // com.intellij.gotoClassContributor EP), so Community is a valid, stricter baseline.
+            create(IntelliJPlatformType.IntellijIdeaCommunity, "2023.3")
         }
-        // PSI-based type-name navigation (JavaPsiFacade / PsiShortNamesCache / NavigationUtil) needs the
-        // Java plugin on the compile/runtime classpath.
-        bundledPlugin("com.intellij.java")
     }
 }
 
