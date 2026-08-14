@@ -9,6 +9,8 @@ import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiField
+import com.intellij.psi.PsiMethod
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.PsiShortNamesCache
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -68,4 +70,24 @@ internal fun findMember(psiClass: PsiClass, name: String): PsiElement? = ReadAct
     psiClass.findMethodsByName(name, true).firstOrNull()
         ?: psiClass.findFieldByName(name, true)
         ?: psiClass.findInnerClassByName(name, true)
+}
+
+/**
+ * Whether [element] is declared inside the project's own content (a source file under a content root),
+ * as opposed to a library / JDK class.
+ *
+ * Member links use this so an *inherited* member declared outside the project — e.g.
+ * `CustomerException#getMessage`, inherited from `Throwable` — navigates to the *referenced* class instead
+ * of diving into the JDK sources. A member declared in the referenced class itself (or in another project
+ * class) still navigates precisely to the member.
+ */
+internal fun isInProjectContent(element: PsiElement, project: Project): Boolean {
+    val declaringClass = when (element) {
+        is PsiMethod -> element.containingClass
+        is PsiField -> element.containingClass
+        is PsiClass -> element.containingClass
+        else -> null
+    } ?: return false
+    val vf = declaringClass.containingFile?.virtualFile ?: return false
+    return ProjectRootManager.getInstance(project).fileIndex.isInContent(vf)
 }

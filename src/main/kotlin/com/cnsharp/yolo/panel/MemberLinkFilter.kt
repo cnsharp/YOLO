@@ -42,7 +42,11 @@ class MemberLinkFilter(private val project: Project) : HyperlinkFilter {
                 } else {
                     resolveSimpleClass(project, classRef)
                 } ?: return@yoloHyperlink
-                val target: PsiElement = findMember(psiClass, member) ?: psiClass
+                // Land on the member only when it is declared in the project (incl. a project base class);
+                // an inherited member from a library/JDK class (e.g. CustomerException#getMessage from
+                // Throwable) would otherwise jump into the JDK, so fall back to the referenced class instead.
+                val member = findMember(psiClass, member)
+                val target: PsiElement = if (member != null && isInProjectContent(member, project)) member else psiClass
                 openElementAt(project, target)
             }
             items.add(LinkResultItem(matcher.start(), matcher.end(), link))
