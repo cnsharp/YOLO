@@ -1,10 +1,13 @@
 package com.cnsharp.yolo.terminal
 
 import com.cnsharp.yolo.settings.AgentExtenderSettingsExp
+import com.cnsharp.yolo.settings.AgentExtenderSettingsListener
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.wm.ToolWindow
+import com.intellij.terminal.frontend.action.TerminalAgentsAvailabilityService
 import org.jetbrains.plugins.terminal.TerminalToolWindowInitializer
 
 /**
@@ -24,6 +27,8 @@ class SkipToggleToolWindowInitializer : TerminalToolWindowInitializer {
         // The terminal tool window is initialized during startup; this hook triggers an agent sync once per IDE
         // session, adding currently installed agents to the config and removing the need for manual "reload". Idempotent; repeated calls are harmless.
         AgentExtenderSettingsExp.getInstance().ensureSyncScheduled()
+
+        subscribeToSettingsChanges(toolWindow)
 
         val am = ActionManager.getInstance()
         val skipAction = am.getAction(SKIP_ACTION_ID)
@@ -47,6 +52,24 @@ class SkipToggleToolWindowInitializer : TerminalToolWindowInitializer {
         val titleActions = listOf(skipAction) + agentActions + listOfNotNull(settingsAction)
         toolWindow.setTitleActions(titleActions)
         LOG.info("AI Agents Extender: installed terminal title actions (${titleActions.size} items)")
+    }
+
+    /**
+     * Refresh the AI Agents toolbar when the user applies changes in Settings.
+     *
+     * Opening the dropdown already calls TerminalAgentsAvailabilityService.refreshAvailableAgents() itself, so
+     * the popup contents are never stale. The title-bar buttons, however, read the *cached* list
+     * (getAvailableTerminalAgentEntries -> getAvailableAgents), so without this the selected agent's name and
+     * icon keep showing pre-Apply values until the dropdown is opened once.
+     */
+    private fun subscribeToSettingsChanges(toolWindow: ToolWindow) {
+        val project = toolWindow.project
+        ApplicationManager.getApplication().messageBus.connect(toolWindow.disposable)
+            .subscribe(AgentExtenderSettingsExp.CHANGED, object : AgentExtenderSettingsListener {
+                override fun changed() {
+                    TerminalAgentsAvailabilityService.getInstance(project).prewarm()
+                }
+            })
     }
 
     companion object {
