@@ -107,6 +107,18 @@ class AgentExtenderSettingsExp : PersistentStateComponent<AgentExtenderSettingsE
 
     private var syncScheduled = false
 
+    /**
+     * Lower-cased identifiers (binary name + agent key, e.g. "claude", "claude-code", "codex") of every
+     * IDEA built-in agent. Cached during [syncInstalledAgents] so [CustomTerminalAgentProvider] can drop
+     * custom tools that duplicate a built-in without re-invoking TerminalAgent.getAllTerminalAgents()
+     * (which would recurse, since that call drives the provider itself).
+     */
+    @Volatile
+    private var cachedBuiltInIds: Set<String> = emptySet()
+
+    /** Read-only view of [cachedBuiltInIds] for the terminal agent provider. */
+    fun builtInAgentIds(): Set<String> = cachedBuiltInIds
+
     init {
         // On every IDE startup (first access to the service, i.e. one session), trigger one background sync:
         // add the currently "installed" built-in / promoted agents into the config so the terminal dropdown
@@ -136,6 +148,12 @@ class AgentExtenderSettingsExp : PersistentStateComponent<AgentExtenderSettingsE
      *  Note: spawns processes, so the caller must ensure this runs on a background thread.
      */
     fun syncInstalledAgents() {
+        // Cache the set of built-in agent identifiers (binary name + agent key) up front. Both the
+        // cleanup below and the terminal agent provider use it to suppress duplicate custom tools.
+        val builtInIds = BuiltInAgents.all().flatMap { agent ->
+            listOfNotNull(agent.binaryName, agent.agentKey.key).map { it.lowercase() }
+        }.toSet()
+        cachedBuiltInIds = builtInIds
         for (agent in BuiltInAgents.all()) {
             val id = agent.binaryName
             if (!AgentDetector.canExecute(id)) continue
