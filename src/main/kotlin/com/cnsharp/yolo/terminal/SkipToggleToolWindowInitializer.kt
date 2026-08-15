@@ -1,6 +1,6 @@
 package com.cnsharp.yolo.terminal
 
-import com.cnsharp.yolo.settings.AgentExtenderSettings
+import com.cnsharp.yolo.settings.AgentExtenderSettingsExp
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.diagnostic.Logger
@@ -23,7 +23,7 @@ class SkipToggleToolWindowInitializer : TerminalToolWindowInitializer {
     override fun initialize(toolWindow: ToolWindow) {
         // The terminal tool window is initialized during startup; this hook triggers an agent sync once per IDE
         // session, adding currently installed agents to the config and removing the need for manual "reload". Idempotent; repeated calls are harmless.
-        AgentExtenderSettings.getInstance().ensureSyncScheduled()
+        AgentExtenderSettingsExp.getInstance().ensureSyncScheduled()
 
         val am = ActionManager.getInstance()
         val skipAction = am.getAction(SKIP_ACTION_ID)
@@ -52,8 +52,8 @@ class SkipToggleToolWindowInitializer : TerminalToolWindowInitializer {
     companion object {
         private val LOG = Logger.getInstance(SkipToggleToolWindowInitializer::class.java)
 
-        private const val SKIP_ACTION_ID = "com.cnsharp.yolo.SkipPermissionsAction"
-        private const val SETTINGS_ACTION_ID = "com.cnsharp.yolo.OpenSettingsAction"
+        private const val SKIP_ACTION_ID = "com.cnsharp.yolo.exp.SkipPermissionsAction"
+        private const val SETTINGS_ACTION_ID = "com.cnsharp.yolo.exp.OpenSettingsAction"
 
         /** The three actions of the AI Agents dropdown, ordered consistently with the terminal frontend. */
         private val AI_AGENTS_ACTION_IDS = listOf(

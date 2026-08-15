@@ -96,9 +96,12 @@ object PromotedAgents {
     )
 }
 
-@State(name = "AgentExtenderSettings", storages = [Storage("agentExtender.xml")])
+// Namespaced as "AgentExtenderSettingsExp" so this plugin (com.cnsharp.yolo.exp) can be installed
+// alongside the release build (com.cnsharp.yolo, v1.0.1) without a "Conflicting component name" error.
+// Both register a PersistentStateComponent, so the @State name AND the storage file must differ.
+@State(name = "AgentExtenderSettingsExp", storages = [Storage("agentExtenderExp.xml")])
 @Service(Service.Level.APP)
-class AgentExtenderSettings : PersistentStateComponent<AgentExtenderSettings.State> {
+class AgentExtenderSettingsExp : PersistentStateComponent<AgentExtenderSettingsExp.State> {
 
     private var currentState: State = State()
 
@@ -168,8 +171,13 @@ class AgentExtenderSettings : PersistentStateComponent<AgentExtenderSettings.Sta
     }
 
     companion object {
-        fun getInstance(): AgentExtenderSettings =
-            com.intellij.openapi.components.service<AgentExtenderSettings>()
+        /** Fired on Settings | Tools | YOLO → Apply, so the terminal's AI Agents toolbar can refresh its cached agent list. */
+        // Namespaced topic name so it does not collide with the release build's "AgentExtenderSettings.Changed" bus topic.
+        val CHANGED: Topic<AgentExtenderSettingsListener> =
+            Topic.create("AgentExtenderSettingsExp.Changed", AgentExtenderSettingsListener::class.java)
+
+        fun getInstance(): AgentExtenderSettingsExp =
+            com.intellij.openapi.components.service<AgentExtenderSettingsExp>()
                 .also { it.ensureSyncScheduled() }
     }
 }

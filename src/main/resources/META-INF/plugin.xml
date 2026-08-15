@@ -1,5 +1,5 @@
 <idea-plugin>
-    <id>com.cnsharp.yolo</id>
+    <id>com.cnsharp.yolo.exp</id>
     <!-- <name> is injected at build time: build.gradle.kts reads and overwrites it from
          messages/YoloBundle.properties' plugin.name, so the product name is maintained only in
          that single key. This is just a placeholder. -->
@@ -30,14 +30,14 @@
     <resource-bundle>messages.YoloBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <applicationService serviceImplementation="com.cnsharp.yolo.settings.AgentExtenderSettings"/>
+        <applicationService serviceImplementation="com.cnsharp.yolo.settings.AgentExtenderSettingsExp"/>
         <!-- displayName is omitted: key points to YoloBundle's plugin.name, so the product name is maintained only in that one place -->
         <applicationConfigurable instance="com.cnsharp.yolo.settings.AgentExtenderConfigurable"
                       groupId="tools"
                       key="plugin.name"
                       bundle="messages.YoloBundle"
-                      id="com.cnsharp.yolo.configurable"/>
-        <notificationGroup id="com.cnsharp.yolo.notifications" displayType="BALLOON"/>
+                      id="com.cnsharp.yolo.exp.configurable"/>
+        <notificationGroup id="com.cnsharp.yolo.exp.notifications" displayType="BALLOON"/>
     </extensions>
 
     <!-- Extension points used by the terminal AI Agents dropdown (all from org.jetbrains.plugins.terminal).
@@ -59,10 +59,10 @@
 
     <actions>
         <!-- text/description omitted: resolved by the <resource-bundle> above via
-             action.com.cnsharp.yolo.SkipPermissionsAction.text/.description -->
-        <action id="com.cnsharp.yolo.SkipPermissionsAction"
+             action.com.cnsharp.yolo.exp.SkipPermissionsAction.text/.description -->
+        <action id="com.cnsharp.yolo.exp.SkipPermissionsAction"
                 class="com.cnsharp.yolo.launcher.SkipPermissionsAction"/>
-        <action id="com.cnsharp.yolo.OpenSettingsAction"
+        <action id="com.cnsharp.yolo.exp.OpenSettingsAction"
                 class="com.cnsharp.yolo.settings.OpenSettingsAction"/>
     </actions>
 </idea-plugin>

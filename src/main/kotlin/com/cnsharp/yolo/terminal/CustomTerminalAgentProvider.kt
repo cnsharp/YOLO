@@ -1,6 +1,6 @@
 package com.cnsharp.yolo.terminal
 
-import com.cnsharp.yolo.settings.AgentExtenderSettings
+import com.cnsharp.yolo.settings.AgentExtenderSettingsExp
 import com.cnsharp.yolo.settings.CustomTool
 import org.jetbrains.plugins.terminal.agent.TerminalAgent
 import org.jetbrains.plugins.terminal.agent.TerminalAgentProvider
@@ -17,7 +17,7 @@ import javax.swing.Icon
 class CustomTerminalAgentProvider : TerminalAgentProvider {
 
     override fun getTerminalAgents(): List<TerminalAgent> =
-        AgentExtenderSettings.getInstance().state.customTools
+        AgentExtenderSettingsExp.getInstance().state.customTools
             .filter { it.id.isNotBlank() && it.command.isNotBlank() }
             .map { CustomTerminalAgent(it) }
 }
