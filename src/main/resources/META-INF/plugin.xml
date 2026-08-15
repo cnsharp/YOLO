@@ -5,7 +5,7 @@
          that single key. This is just a placeholder. -->
     <name>YOLO: AI Agents Extender</name>
     <!-- <version> is also injected at build time: from pluginVersion in gradle.properties. This is just a placeholder. -->
-    <version>0.2.0</version>
+    <version>0.0.0</version>
     <vendor email="support@cnsharp.com" url="">CnSharp Studio</vendor>
     <description><![CDATA[
 <p><b>YOLO</b> is a standalone <b>AI Agents</b> panel for IntelliJ IDEA. It lists your AI CLIs (Claude Code, Codex, CodeBuddy, Qoder, or your own) and launches any of them in a <b>real, interactive terminal inside the IDE</b> with a single click — no Terminal plugin required. Everything the agent prints becomes <b>clickable</b>: jump from its output straight to the code.</p>
