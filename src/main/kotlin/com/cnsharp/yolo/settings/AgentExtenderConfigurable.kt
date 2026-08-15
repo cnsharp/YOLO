@@ -199,9 +199,10 @@ class AgentExtenderConfigurable : Configurable {
             browse.isEnabled = !locked
         }
         browse.addActionListener {
-            // `withFileFilter` (since 2019.2) and `createSingleFileDescriptor()` are both long-stable and
-            // non-deprecated on 2023.3 (the minimum we support) as well as 2026.2.
-            val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor()
+            // `withFileFilter` (since 2019.2) is long-stable and non-deprecated on 2023.3 (our min) through 2026.2.
+            // `createSingleFileDescriptor(String)` (with a title) is the non-deprecated form; the no-arg overload
+            // is deprecated since 2025.x, so use the titled overload here.
+            val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor("Select icon file")
                 .withFileFilter { it.extension == "svg" || it.extension == "png" }
             val initial = textField.text?.takeIf { it.isNotBlank() && !it.startsWith("http", true) }?.let {
                 LocalFileSystem.getInstance().findFileByPath(it)

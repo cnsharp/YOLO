@@ -50,6 +50,7 @@
         <toolWindow id="YOLO"
                     anchor="right"
                     icon="/icons/agents/skipY.svg"
+                    doNotActivateOnStart="true"
                     factoryClass="com.cnsharp.yolo.panel.YoloToolWindowFactory"/>
     </extensions>
 
