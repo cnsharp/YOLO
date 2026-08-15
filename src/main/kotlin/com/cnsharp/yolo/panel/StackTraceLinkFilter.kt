@@ -1,6 +1,6 @@
 package com.cnsharp.yolo.panel
 
-import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.psi.search.FilenameIndex
@@ -70,27 +70,27 @@ class StackTraceLinkFilter(
     /** Resolve a file name (possibly with directories) against the working dir, content roots, and the filename
      *  index. Called from the click handler (EDT), wrapped in a read action because FilenameIndex / the
      *  project model require one. */
-    private fun resolve(raw: String): File? = ReadAction.compute<File?, Throwable> {
+    private fun resolve(raw: String): File? = runReadAction {
         val base = File(baseDir, raw)
-        if (base.isFile) return@compute base
+        if (base.isFile) return@runReadAction base
         // Content-root + filename-index resolution needs a live project; without one (e.g. offline unit
         // tests) we still resolve against the working dir and absolute paths below.
         val project = this.project
         if (project != null) {
             for (root in ProjectRootManager.getInstance(project).contentRoots) {
                 val f = File(root.path, raw)
-                if (f.isFile) return@compute f
+                if (f.isFile) return@runReadAction f
             }
             // Bare file name: find by name across the project's indexed files.
             if (!raw.contains('/') && !raw.contains('\\')) {
                 for (vf in FilenameIndex.getVirtualFilesByName(raw, GlobalSearchScope.projectScope(project))) {
-                    if (!vf.isDirectory) return@compute File(vf.path)
+                    if (!vf.isDirectory) return@runReadAction File(vf.path)
                 }
             }
         }
         // Absolute / already-rooted path.
         val abs = File(raw)
-        if (abs.isFile) return@compute abs
+        if (abs.isFile) return@runReadAction abs
         null
     }
 

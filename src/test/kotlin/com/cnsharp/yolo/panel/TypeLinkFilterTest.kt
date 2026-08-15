@@ -17,8 +17,7 @@ import org.junit.Test
 class TypeLinkFilterTest {
 
     private val types = YoloProjectTypes.Snapshot(
-        simple = setOf("YoloToolWindowFactory", "AgentExtenderSettings"),
-        qualified = setOf("com.cnsharp.yolo.panel.TypeLinkFilter"),
+        simple = setOf("YoloToolWindowFactory", "AgentExtenderSettings", "TypeLinkFilter"),
         files = setOf("YoloNavigation", "Main"),
     )
 

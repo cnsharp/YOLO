@@ -43,7 +43,9 @@ class TypeLinkFilter(
             val qualified = matcher.group("qualified")
             val simple = matcher.group("simple")
             val known = when {
-                qualified != null -> types.containsQualified(qualified)
+                // Qualified name: gate by its trailing segment being a known project type. This avoids the
+                // old O(N²) pre-computation of the full qualified set; resolution still happens on click.
+                qualified != null -> lastTypeNameSegment(qualified) in types.simple
                 simple != null -> types.containsSimple(simple)
                 else -> false
             }

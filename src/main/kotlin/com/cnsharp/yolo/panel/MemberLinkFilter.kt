@@ -34,7 +34,9 @@ class MemberLinkFilter(private val project: Project) : HyperlinkFilter {
         while (matcher.find() && guard++ < MAX_MATCHES_PER_LINE) {
             val classRef = matcher.group("class") ?: continue
             val member = matcher.group("member") ?: continue
-            val known = if (isQualifiedName(classRef)) types.containsQualified(classRef) else types.containsSimple(classRef)
+            // Gate the class part: a qualified ref is linked when its trailing segment is a known project
+            // type (cheap, derived from the simple-name set); a simple ref must be a known project type.
+            val known = if (isQualifiedName(classRef)) lastTypeNameSegment(classRef) in types.simple else types.containsSimple(classRef)
             if (!known) continue
             // Resolution is deferred to click time so streaming output is never blocked by PSI index queries
             // on the terminal emulator thread. The link navigates only if the class/member resolves.

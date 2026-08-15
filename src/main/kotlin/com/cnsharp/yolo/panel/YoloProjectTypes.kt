@@ -1,10 +1,8 @@
 package com.cnsharp.yolo.panel
 
 import com.intellij.navigation.ChooseByNameContributor
-import com.intellij.navigation.GotoClassContributor
-import com.intellij.navigation.NavigationItem
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.project.ProjectManagerListener
@@ -15,9 +13,10 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Lazily-built, index-invalidated snapshot of the project's own type names (simple names and
- * fully-qualified names) plus its source-file base names. The terminal hyperlink filters use it to decide
- * which identifiers are worth turning into clickable links.
+ * Lazily-built, index-invalidated snapshot of the project's own type simple names plus its source-file
+ * base names. The terminal hyperlink filters use it to decide which identifiers are worth turning into
+ * clickable links. Qualified-name references are gated cheaply from [Snapshot.simple] (a qualified ref is
+ * linked when its trailing segment is a known project type); actual resolution stays lazy, on click.
  *
  * Without this gate, the filters' regexes match every capitalized word — `Result`, `OK`, `Error`, or the
  * `Ctrl` in a `Ctrl/C` shortcut notation — and paint it blue even though it is not a project type. Restricting
@@ -52,13 +51,11 @@ object YoloProjectTypes {
     /** Immutable view of the project's type names; cheap to hold and query within a single line scan. */
     data class Snapshot(
         val simple: Set<String>,
-        val qualified: Set<String> = emptySet(),
         val files: Set<String> = emptySet(),
         /** Base-name → VirtualFile for the bare source-file fallback (project content roots only). */
         val fileMap: Map<String, VirtualFile> = emptyMap(),
     ) {
         fun containsSimple(name: String): Boolean = name in simple
-        fun containsQualified(name: String): Boolean = name in qualified
         fun containsFile(name: String): Boolean = name in files
         /** Resolve a bare source-file base name to its VirtualFile, or null if it is not a project file. */
         fun resolveFile(name: String): VirtualFile? = fileMap[name]
@@ -93,7 +90,7 @@ object YoloProjectTypes {
         if (cache.modCount != modCount && cache.refreshScheduled.compareAndSet(false, true)) {
             ApplicationManager.getApplication().executeOnPooledThread {
                 try {
-                    val built = ReadAction.compute<Snapshot, Throwable> { build(project) }
+                    val built = runReadAction { build(project) }
                     cache.snapshot = built
                     cache.modCount = modCount
                 } finally {
@@ -105,26 +102,21 @@ object YoloProjectTypes {
     }
 
     private fun build(project: Project): Snapshot {
-        // All languages' project class names, via the language-agnostic goto-class EP.
+        // All languages' project class *simple* names, via the language-agnostic goto-class EP.
         // includeNonProjectItems = false restricts to project content (excludes JDK/library types), matching
-        // the previous "content roots only" gate so ubiquitous types (String, List, …) are not linked.
-        // Both simple and fully-qualified names are collected so the filters can gate precisely — mirroring
-        // the old PsiShortNamesCache pass, but driven by the EP every language implements.
+        // the "content roots only" gate so ubiquitous types (String, List, …) are not linked.
+        //
+        // IMPORTANT — performance: we collect ONLY simple names here. An earlier version also called
+        // getItemsByName() for *every* simple name to pre-compute the fully-qualified set — an O(N²) sweep
+        // (N = class count) inside a single ReadAction. On a large project that took seconds and blocked the
+        // EDT / index, which is the multi-window lag that was reported. Qualified-name gating is now derived
+        // cheaply from this simple-name set (see TypeLinkFilter / MemberLinkFilter: a qualified reference is
+        // linked when its trailing segment is a known project type), and real resolution still happens lazily
+        // on click via resolveType().
         val simple = mutableSetOf<String>()
-        val qualified = mutableSetOf<String>()
         for (contributor in ChooseByNameContributor.CLASS_EP_NAME.extensionList) {
             val names = runCatching { contributor.getNames(project, false) }.getOrNull() ?: continue
             simple.addAll(names)
-            for (name in names) {
-                val items = runCatching {
-                    contributor.getItemsByName(name, name, project, false)
-                }.getOrNull() ?: continue
-                for (item in items) {
-                    val navItem = item as? NavigationItem ?: continue
-                    val qn = (contributor as? GotoClassContributor)?.getQualifiedName(navItem)
-                    if (qn != null) qualified.add(qn)
-                }
-            }
         }
         // Source-file base names (without extension) so Kotlin file facades — top-level-function files with
         // no enclosing class (e.g. `YoloNavigation.kt`) — are still recognized as project references and can
@@ -146,6 +138,6 @@ object YoloProjectTypes {
             }
             true
         }
-        return Snapshot(simple, qualified, files, fileMap)
+        return Snapshot(simple, files, fileMap)
     }
 }

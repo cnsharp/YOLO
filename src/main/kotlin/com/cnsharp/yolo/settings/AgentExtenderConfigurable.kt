@@ -199,10 +199,9 @@ class AgentExtenderConfigurable : Configurable {
             browse.isEnabled = !locked
         }
         browse.addActionListener {
-            // `withExtensionFilter` is only available on newer IDEA; use the long-stable `withFileFilter`
-            // (since 2019.2) so the settings UI also works on 2023.3.
-            val descriptor = FileChooserDescriptorFactory
-                .createSingleFileDescriptor()
+            // `withFileFilter` (since 2019.2) and `createSingleFileDescriptor()` are both long-stable and
+            // non-deprecated on 2023.3 (the minimum we support) as well as 2026.2.
+            val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor()
                 .withFileFilter { it.extension == "svg" || it.extension == "png" }
             val initial = textField.text?.takeIf { it.isNotBlank() && !it.startsWith("http", true) }?.let {
                 LocalFileSystem.getInstance().findFileByPath(it)
