@@ -31,7 +31,7 @@ version = providers.gradleProperty("pluginVersion").get()
 intellijPlatform {
     // Use the locally installed IDEA as the SDK for offline builds (no IntelliJ SDK download).
     pluginConfiguration {
-        id = "com.cnsharp.yolo"
+        id = "com.cnsharp.yolo.exp"
         name = productName
         version = project.version.toString()
         vendor {

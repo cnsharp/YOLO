@@ -1,6 +1,6 @@
 package com.cnsharp.yolo.launcher
 
-import com.cnsharp.yolo.settings.AgentExtenderSettings
+import com.cnsharp.yolo.settings.AgentExtenderSettingsExp
 import com.cnsharp.yolo.terminal.AgentIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -20,10 +20,10 @@ import javax.swing.Icon
  * so the platform reads action.<id>.text / .description from YoloBundle and follows IDE language switching. */
 class SkipPermissionsAction : ToggleAction() {
     override fun isSelected(e: AnActionEvent): Boolean =
-        AgentExtenderSettings.getInstance().state.skipEnabled
+        AgentExtenderSettingsExp.getInstance().state.skipEnabled
 
     override fun setSelected(e: AnActionEvent, state: Boolean) {
-        AgentExtenderSettings.getInstance().state.skipEnabled = state
+        AgentExtenderSettingsExp.getInstance().state.skipEnabled = state
     }
 
     /** State only reads the in-memory settings and does no PATH probing, so it can be safely evaluated on the EDT. */

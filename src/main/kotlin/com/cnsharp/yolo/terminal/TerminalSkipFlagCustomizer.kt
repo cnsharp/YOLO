@@ -1,7 +1,7 @@
 package com.cnsharp.yolo.terminal
 
 import com.cnsharp.yolo.util.baseName
-import com.cnsharp.yolo.settings.AgentExtenderSettings
+import com.cnsharp.yolo.settings.AgentExtenderSettingsExp
 import com.cnsharp.yolo.settings.DefaultSkipEnvs
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
@@ -28,7 +28,7 @@ class TerminalSkipFlagCustomizer : ShellExecOptionsCustomizer {
         if (command.isEmpty()) return
 
         val exeName = baseName(command[0])
-        val settings = AgentExtenderSettings.getInstance()
+        val settings = AgentExtenderSettingsExp.getInstance()
         val state = settings.state
 
         // Only treat this as an agent launch when it matches a configured custom tool or permission rule.

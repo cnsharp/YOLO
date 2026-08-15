@@ -394,7 +394,7 @@ class AgentExtenderConfigurable : Configurable {
             throw ConfigurationException(text, Yolo.NAME)
         }
 
-        val settings = AgentExtenderSettings.getInstance()
+        val settings = AgentExtenderSettingsExp.getInstance()
 
         // ① Permission rules: from each row's Skip flag (matched by command binary name so the customizer can hit it)
         val newRules = mutableListOf<PermissionRule>()
@@ -434,7 +434,7 @@ class AgentExtenderConfigurable : Configurable {
         }
     }
 
-    private fun finalizeIcons(settings: AgentExtenderSettings) {
+    private fun finalizeIcons(settings: AgentExtenderSettingsExp) {
         var changed = false
         for (tool in settings.state.customTools) {
             val icon = tool.iconPath.trim()
@@ -455,7 +455,7 @@ class AgentExtenderConfigurable : Configurable {
         }
     }
 
-    private fun reportMissingCommands(settings: AgentExtenderSettings) {
+    private fun reportMissingCommands(settings: AgentExtenderSettingsExp) {
         val missing = settings.state.customTools.filter {
             CommandValidator.validate(it.command) is CommandValidator.Result.NotFound
         }
@@ -474,7 +474,7 @@ class AgentExtenderConfigurable : Configurable {
         rebuilding = true
         try {
             toolsModel.rowCount = 0
-            val state = AgentExtenderSettings.getInstance().state
+            val state = AgentExtenderSettingsExp.getInstance().state
             // Index existing permission rules by "command binary name" and write back to each row's Skip flag column
             val ruleByCmd = state.permissionRules.associateBy({ baseName(it.agentId).lowercase() }, { it.flag })
             /** Prefer the user-saved rule; fall back to DefaultSkipFlags (by command name, then by id) if empty. */
@@ -622,7 +622,7 @@ class AgentExtenderConfigurable : Configurable {
         private const val COL_ICON_PATH = 6
 
         private val NOTIFY: com.intellij.notification.NotificationGroup by lazy {
-            NotificationGroupManager.getInstance().getNotificationGroup("com.cnsharp.yolo.notifications")
+            NotificationGroupManager.getInstance().getNotificationGroup("com.cnsharp.yolo.exp.notifications")
         }
     }
 }

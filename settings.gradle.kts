@@ -1,7 +1,8 @@
-// Pin the project name so the built artifact is always yolo-<version>.zip regardless of
+// Pin the project name so the built artifact is always yolo-exp-<version>.zip regardless of
 // the checkout directory name (GitHub checks out into "YOLO", which would otherwise make
-// Gradle produce YOLO-<version>.zip and break the release.yml upload glob).
-rootProject.name = "yolo"
+// Gradle produce YOLO-<version>.zip). The "-exp" suffix keeps it distinguishable from the
+// main edition's yolo-<version>.zip when both are built/installed side by side.
+rootProject.name = "yolo-exp"
 
 pluginManagement {
     repositories {
