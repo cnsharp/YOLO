@@ -91,7 +91,8 @@ object PromotedAgents {
         Meta("openclaw",  "OpenClaw","openclaw"),
         Meta("opencode",  "OpenCode", "opencode"),
         Meta("pi",        "Pi",       "pi"),
-        Meta("qoder",     "Qoder",    "qoder")
+        Meta("qoder",     "Qoder",    "qoder"),
+        Meta("zcode",     "ZCode",    "zcode")   // https://zcode.z.ai/
     )
 }
 
