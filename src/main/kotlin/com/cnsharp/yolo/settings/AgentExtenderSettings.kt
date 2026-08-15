@@ -5,6 +5,7 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
+import com.intellij.util.messages.Topic
 import com.intellij.util.xmlb.XmlSerializerUtil
 import org.jetbrains.plugins.terminal.agent.TerminalAgent
 
@@ -172,6 +173,12 @@ class AgentExtenderSettingsExp : PersistentStateComponent<AgentExtenderSettingsE
                 )
             }
         }
+        // Drop any custom tool that now duplicates an IDEA built-in agent (e.g. legacy claude/codex
+        // entries persisted before IDEA shipped native Claude Code / Codex support). Without this, the
+        // terminal dropdown shows the agent twice — once from IDEA, once from this plugin.
+        currentState.customTools.removeIf { tool ->
+            tool.id.lowercase() in builtInIds || tool.command.lowercase() in builtInIds
+        }
     }
 
     override fun getState(): State = currentState
@@ -186,6 +193,23 @@ class AgentExtenderSettingsExp : PersistentStateComponent<AgentExtenderSettingsE
         // Each agent's skip flag value (from Settings); whether it is injected is controlled by skipEnabled.
         var permissionRules: MutableList<PermissionRule> = mutableListOf()
         var customTools: MutableList<CustomTool> = mutableListOf()
+        /**
+         * Extra launch arguments (base args) for IDEA's built-in agents, keyed by lower-cased command binary
+         * name (e.g. `claude`, not the agent key `claude-code`). Built-in agents are deliberately NOT written
+         * into [customTools] — without this map, an edit to a built-in agent's "Base args" column in Settings
+         * would be silently dropped on save. Promoted and user-added tools store their base args on the
+         * [CustomTool] itself.
+         *
+         * Keyed by binary name because [com.cnsharp.yolo.terminal.TerminalSkipFlagCustomizer] can only match
+         * the launched process by its executable filename.
+         */
+        var agentBaseArgs: MutableMap<String, String> = mutableMapOf()
+        /**
+         * Cache of commands (lower-cased) detected as installed on the machine. Persisted so the settings page
+         * renders install status instantly from this cache on open; a background re-scan refreshes it and only
+         * repaints when the detected set actually differs.
+         */
+        var installedCommands: MutableList<String> = mutableListOf()
     }
 
     companion object {
@@ -198,4 +222,14 @@ class AgentExtenderSettingsExp : PersistentStateComponent<AgentExtenderSettingsE
             com.intellij.openapi.components.service<AgentExtenderSettingsExp>()
                 .also { it.ensureSyncScheduled() }
     }
+
+    /** Publish a change so subscribers (the terminal tool window) can refresh from current state. */
+    fun fireChanged() {
+        ApplicationManager.getApplication().messageBus.syncPublisher(CHANGED).changed()
+    }
+}
+
+/** Notified when the user applies changes in Settings | Tools | YOLO. */
+interface AgentExtenderSettingsListener {
+    fun changed()
 }

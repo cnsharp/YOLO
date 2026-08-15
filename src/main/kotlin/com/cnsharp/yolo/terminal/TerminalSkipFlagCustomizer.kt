@@ -39,12 +39,15 @@ class TerminalSkipFlagCustomizer : ShellExecOptionsCustomizer {
         val rule = state.permissionRules.firstOrNull {
             it.agentId.equals(exeName, ignoreCase = true) || baseName(it.agentId).equals(exeName, ignoreCase = true)
         }
-        if (tool == null && rule == null) return
+        // IDEA's built-in agents are not in customTools, so their base args come from this map instead.
+        val builtInBaseArgs = state.agentBaseArgs[exeName.lowercase()]
+        if (tool == null && rule == null && builtInBaseArgs.isNullOrBlank()) return
 
         val extra = mutableListOf<String>()
 
-        // Fixed launch args for the custom tool
-        tool?.baseArgs?.split(' ')?.filter { it.isNotBlank() }?.let { extra += it }
+        // Fixed launch args, from the custom tool if it is one, otherwise from the built-in agent's overrides
+        val baseArgs = tool?.baseArgs ?: builtInBaseArgs
+        baseArgs?.split(' ')?.filter { it.isNotBlank() }?.let { extra += it }
 
         // Only append the skip args when the toolbar "Skip permissions" checkbox is on.
         // The flag may be multiple tokens (e.g. cline's "--auto-approve true"), so it must be split into

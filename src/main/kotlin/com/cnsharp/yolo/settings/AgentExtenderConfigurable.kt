@@ -23,6 +23,7 @@ import com.intellij.util.ui.FormBuilder
 import org.jetbrains.plugins.terminal.agent.TerminalAgent
 import javax.swing.event.TableModelEvent
 import java.awt.Component
+import java.awt.BorderLayout
 import java.awt.image.BufferedImage
 import javax.swing.GrayFilter
 import javax.swing.Icon
@@ -85,6 +86,10 @@ class AgentExtenderConfigurable : Configurable {
         toolsTable.columnModel.getColumn(COL_ICON).cellRenderer = IconRenderer()
         toolsTable.columnModel.getColumn(COL_ICON).preferredWidth = 48
         toolsTable.columnModel.getColumn(COL_SKIP).preferredWidth = 200
+        // The icon path/URL is edited exclusively via the icon-setting row below the table, so hide this
+        // grid column from the view. The underlying model column is kept — the icon button writes to it and
+        // apply()/reset() still read it for persistence.
+        toolsTable.removeColumn(toolsTable.columnModel.getColumn(COL_ICON_PATH))
 
         // Any cell change (add/remove row, edit, change icon) is marked as "unsaved changes", lighting the Apply button;
         // duplicate checks also run immediately so the user sees conflicts while editing, not only at Apply time.
@@ -162,18 +167,17 @@ class AgentExtenderConfigurable : Configurable {
         }
         val browse = JButton(message("button.browse"))
         browse.toolTipText = message("button.browse.tooltip")
-        val note = JLabel("")
         fun syncEnabled() {
             val row = toolsTable.selectedRow
             val locked = isLockedAgent(row)
             textField.isEnabled = !locked
             browse.isEnabled = !locked
-            note.text = if (locked && row >= 0) message("icon.locked") else ""
         }
         browse.addActionListener {
-            val descriptor = FileChooserDescriptorFactory
-                .createSingleFileDescriptor("svg")
-                .withExtensionFilter(message("icon.chooser.title"), "svg", "png")
+            // createSingleFileDescriptor("svg") seeds the default extension; the file filter below widens the
+            // allowed set to .png as well so users are not forced to rename their icons.
+            val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor("svg")
+                .withFileFilter { it.extension == "svg" || it.extension == "png" }
             val initial = textField.text?.takeIf { it.isNotBlank() && !it.startsWith("http", true) }?.let {
                 LocalFileSystem.getInstance().findFileByPath(it)
             }
@@ -192,11 +196,15 @@ class AgentExtenderConfigurable : Configurable {
             syncEnabled()
         }
         syncEnabled()
-        val p = JPanel(com.intellij.ui.components.panels.HorizontalLayout(6)).apply {
-            add(JLabel(message("icon.label")))
-            add(textField)
+        textField.columns = 30
+        // Label on the left, the path textbox fills the middle, and Browse sits on the right.
+        val right = JPanel(com.intellij.ui.components.panels.HorizontalLayout(6)).apply {
             add(browse)
-            add(note)
+        }
+        val p = JPanel(BorderLayout(6, 0)).apply {
+            add(JLabel(message("icon.label")), BorderLayout.WEST)
+            add(textField, BorderLayout.CENTER)
+            add(right, BorderLayout.EAST)
         }
         return p
     }
@@ -367,20 +375,25 @@ class AgentExtenderConfigurable : Configurable {
 
     // ── Install status (icon lit / greyed) ──────────────────────────
 
-    /** Probe in the background whether each row's Command can actually be executed, yielding an "installed" flag that drives icon lit/greyed. */
+    /** Render each row's icon lit/greyed from the shared installed-agents cache, then refresh the cache in the
+     *  background; only re-render when the detected set changes. */
     private fun refreshInstalledFlags() {
-        val app = ApplicationManager.getApplication()
-        val n = toolsModel.rowCount
-        app.executeOnPooledThread {
-            val flags = BooleanArray(n) { i ->
-                val cmd = (toolsModel.getValueAt(i, COL_COMMAND) as? String)?.trim() ?: ""
-                cmd.isNotEmpty() && AgentDetector.canExecute(cmd)
-            }
-            app.invokeLater {
-                toolsTable.setInstalled(flags)
-            }
+        val commands = (0 until toolsModel.rowCount).map { r ->
+            (toolsModel.getValueAt(r, COL_COMMAND) as? String)?.trim() ?: ""
+        }
+        // Instant render from the cache...
+        toolsTable.setInstalled(flagsFor(commands, InstalledAgents.installed()))
+        // ...then refresh the cache and re-render only if the installed set actually changed.
+        InstalledAgents.rescan(commands) { set ->
+            toolsTable.setInstalled(flagsFor(commands, set))
         }
     }
+
+    /** Build the per-row "installed" flags: a command is installed iff it is non-blank and present (lower-cased) in [installed]. */
+    private fun flagsFor(commands: List<String>, installed: Set<String>): BooleanArray =
+        BooleanArray(commands.size) { i ->
+            commands[i].isNotEmpty() && commands[i].lowercase() in installed
+        }
 
     // ── Persistence ──────────────────────────────────────────────────
 
@@ -424,9 +437,28 @@ class AgentExtenderConfigurable : Configurable {
             )
         }.toMutableList()
 
+        // ②b Persist "Base args" overrides for IDEA's built-in agents. They are deliberately NOT written into
+        //    customTools (section ②), so a dedicated map is needed — otherwise an edit to a built-in agent's
+        //    Base args column would be silently discarded on Apply. Keyed by command binary name, because
+        //    TerminalSkipFlagCustomizer can only match the launched process by its executable filename.
+        val baseArgsMap = settings.state.agentBaseArgs
+        baseArgsMap.clear()
+        for (r in 0 until toolsModel.rowCount) {
+            val id = (toolsModel.getValueAt(r, COL_ID) as? String)?.trim() ?: ""
+            if (id.lowercase() !in builtInIds) continue
+            val command = (toolsModel.getValueAt(r, COL_COMMAND) as? String)?.trim() ?: ""
+            val baseArgs = (toolsModel.getValueAt(r, COL_BASE_ARGS) as? String)?.trim() ?: ""
+            if (command.isNotEmpty() && baseArgs.isNotEmpty()) {
+                baseArgsMap[baseName(command).lowercase()] = baseArgs
+            }
+        }
+
         AgentIcons.clearCache()
 
         modified = false
+
+        // Notify the terminal tool window so its AI Agents toolbar refreshes its cached agent list.
+        settings.fireChanged()
 
         ApplicationManager.getApplication().executeOnPooledThread {
             finalizeIcons(settings)
@@ -495,19 +527,24 @@ class AgentExtenderConfigurable : Configurable {
             // IDEA built-in (dynamic): add row by row (keep IDEA's native order, highest priority)
             for (agent in builtIns) {
                 val id = agent.agentKey.key
+                // Built-in agents are not written to customTools, so their base args live in agentBaseArgs.
+                val baseArgs = state.agentBaseArgs[baseName(agent.binaryName).lowercase()] ?: ""
                 toolsModel.addRow(
                     arrayOf<Any>(
                         "", id, agent.displayName, agent.binaryName,
-                        "", flagFor(agent.binaryName, id), ""
+                        baseArgs, flagFor(agent.binaryName, id), ""
                     )
                 )
             }
             // ② Promoted by this plugin (e.g. codebuddy): sorted by id first letter; priority below built-in, above user custom
             for (meta in PromotedAgents.entries.sortedBy { it.id.lowercase() }) {
+                // Promoted agents *are* written to customTools (that is how they reach the dropdown), so read
+                // their base args back from there — otherwise the column would render empty and Apply would wipe it.
+                val baseArgs = state.customTools.firstOrNull { it.id.equals(meta.id, ignoreCase = true) }?.baseArgs ?: ""
                 toolsModel.addRow(
                     arrayOf<Any>(
                         "", meta.id, meta.displayName, meta.command,
-                        "", flagFor(meta.command, meta.id), ""
+                        baseArgs, flagFor(meta.command, meta.id), ""
                     )
                 )
             }
