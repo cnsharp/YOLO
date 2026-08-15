@@ -485,7 +485,6 @@ class AgentExtenderConfigurable : Configurable {
 
         ApplicationManager.getApplication().executeOnPooledThread {
             finalizeIcons(settings)
-            reportMissingCommands(settings)
         }
     }
 
@@ -507,20 +506,6 @@ class AgentExtenderConfigurable : Configurable {
             ApplicationManager.getApplication().invokeLater {
                 AgentIcons.clearCache()
             }
-        }
-    }
-
-    private fun reportMissingCommands(settings: AgentExtenderSettings) {
-        val missing = settings.state.customTools.filter {
-            CommandValidator.validate(it.command) is CommandValidator.Result.NotFound
-        }
-        if (missing.isNotEmpty()) {
-            val names = missing.joinToString(", ") { it.displayName.ifBlank { it.id } }
-            NOTIFY.createNotification(
-                Yolo.NAME,
-                message("notify.missingCommands", names),
-                NotificationType.WARNING
-            ).notify(null)
         }
     }
 
