@@ -44,7 +44,8 @@ object AgentIcons {
         "kilo"      to "/icons/agents/kilo.svg",
         "goose"     to "/icons/agents/goose.png",
         "openclaw"  to "/icons/agents/openclaw.svg",
-        "pi"        to "/icons/agents/pi.svg"
+        "pi"        to "/icons/agents/pi.svg",
+        "zcode"     to "/icons/agents/zcode.png"
     )
 
     /** y icon for the Skip permissions checkbox (off/on). */
