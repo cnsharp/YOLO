@@ -5,7 +5,7 @@
          that single key. This is just a placeholder. -->
     <name>YOLO: AI Agents Extender</name>
     <!-- <version> is also injected at build time: from pluginVersion in gradle.properties. This is just a placeholder. -->
-    <version>0.2.0</version>
+    <version>0.0.0</version>
     <vendor email="support@cnsharp.com" url="">CnSharp Studio</vendor>
     <description><![CDATA[
 <p><b>YOLO</b> extends IntelliJ IDEA's Terminal <b>AI Agents</b> dropdown with your own tools, and lets you launch them in <b>YOLO mode</b> with a single click.</p>
