@@ -129,11 +129,16 @@ internal val STACK_PY_SQ_PATTERN: Pattern = Pattern.compile(
  * one pattern covers them all; actual resolution/gating is delegated to [com.cnsharp.yolo.panel.YoloProjectTypes]
  * + the language-agnostic `gotoClassContributor` EP.
  *
+ * The simple branch is case-*shape* sensitive: it requires a `PascalCase` type name (starts uppercase, not
+ * all-uppercase), so all-caps tokens like `OK`, `BUILD`, `SUCCESSFUL` are rejected — they are constant/acronym
+ * style, not type names, and would otherwise link whenever the project happens to define a same-named type.
+ * Qualified names are unaffected.
+ *
  * **Named groups:** `qualified`, `simple` (mutually exclusive — exactly one is non-null per match).
  */
 internal val TYPE_NAME_PATTERN: Pattern = Pattern.compile(
     """(?<![.\w/\\])(?<qualified>\\?(?:[A-Za-z_][A-Za-z0-9_]*+)(?:(?:\.|::|\\)[A-Za-z_][A-Za-z0-9_]*+)+)(?!\.[a-z])""" +
-        """|(?<![.\w/\\])(?<simple>[A-Z][a-zA-Z0-9_]*+)(?!\.[a-z])"""
+        """|(?<![.\w/\\])(?<simple>(?![A-Z]+\b)[A-Z][a-zA-Z0-9_]*+)(?!\.[a-z])"""
 )
 
 /**
