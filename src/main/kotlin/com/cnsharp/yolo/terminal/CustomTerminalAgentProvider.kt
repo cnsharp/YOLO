@@ -16,10 +16,20 @@ import javax.swing.Icon
  */
 class CustomTerminalAgentProvider : TerminalAgentProvider {
 
-    override fun getTerminalAgents(): List<TerminalAgent> =
-        AgentExtenderSettingsExp.getInstance().state.customTools
+    override fun getTerminalAgents(): List<TerminalAgent> {
+        // Lower-cased identifiers of every IDEA built-in agent (binary name + agent key, e.g.
+        // "claude", "claude-code", "codex"), cached by the settings service during the startup sync.
+        // We read the cache rather than recomputing via BuiltInAgents.all() because that would call
+        // TerminalAgent.getAllTerminalAgents() re-entrantly (this provider is invoked by it).
+        val builtInIds = AgentExtenderSettingsExp.getInstance().builtInAgentIds()
+        return AgentExtenderSettingsExp.getInstance().state.customTools
             .filter { it.id.isNotBlank() && it.command.isNotBlank() }
+            // Drop any custom tool that duplicates an IDEA built-in agent (e.g. legacy claude/codex
+            // persisted before IDEA shipped native Claude Code / Codex support), so the dropdown
+            // shows each agent exactly once.
+            .filter { it.id.lowercase() !in builtInIds && it.command.lowercase() !in builtInIds }
             .map { CustomTerminalAgent(it) }
+    }
 }
 
 private class CustomTerminalAgent(private val tool: CustomTool) : TerminalAgent {
