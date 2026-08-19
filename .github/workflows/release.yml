@@ -39,5 +39,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: build/distributions/*.zip
+          prerelease: true   # experimental builds are published as pre-releases
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
