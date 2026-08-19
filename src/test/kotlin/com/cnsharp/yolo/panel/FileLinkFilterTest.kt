@@ -101,6 +101,15 @@ class FileLinkFilterTest {
     }
 
     @Test
+    fun testHyphenatedPathLinksEntirely() {
+        // Paths containing hyphens (e.g. report filenames like `ParamConfigService-unused-fields.html`)
+        // must not be split at the hyphen. The regex character class `[A-Za-z0-9._\-]` includes `-`,
+        // but we keep a regression test so any future change that drops it is caught.
+        val path = "docs/ParamConfigService-unused-fields.html"
+        assertEquals(listOf(path), linked(path))
+    }
+
+    @Test
     fun testWrappedHeadFragmentIsNotLinked() {
         // Simulate the terminal hard-wrap: the head fragment has neither an extension nor a line number.
         val head = "./app/biz/service-impl/target/order-biz-service-impl-5.584.3-SNAPSHOT/WEB-INF/cla"
