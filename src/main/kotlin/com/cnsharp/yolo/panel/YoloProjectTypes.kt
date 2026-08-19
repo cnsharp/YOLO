@@ -102,22 +102,9 @@ object YoloProjectTypes {
     }
 
     private fun build(project: Project): Snapshot {
-        // All languages' project class *simple* names, via the language-agnostic goto-class EP.
-        // includeNonProjectItems = false restricts to project content (excludes JDK/library types), matching
-        // the "content roots only" gate so ubiquitous types (String, List, …) are not linked.
-        //
-        // IMPORTANT — performance: we collect ONLY simple names here. An earlier version also called
-        // getItemsByName() for *every* simple name to pre-compute the fully-qualified set — an O(N²) sweep
-        // (N = class count) inside a single ReadAction. On a large project that took seconds and blocked the
-        // EDT / index, which is the multi-window lag that was reported. Qualified-name gating is now derived
-        // cheaply from this simple-name set (see TypeLinkFilter / MemberLinkFilter: a qualified reference is
-        // linked when its trailing segment is a known project type), and real resolution still happens lazily
-        // on click via resolveType().
-        val simple = mutableSetOf<String>()
-        for (contributor in ChooseByNameContributor.CLASS_EP_NAME.extensionList) {
-            val names = runCatching { contributor.getNames(project, false) }.getOrNull() ?: continue
-            simple.addAll(names)
-        }
+        // Project type *simple* names, via the language-agnostic goto-class EP (see scopeProjectSimpleNames
+        // for why each name is additionally scope-checked before it is admitted to the gate).
+        val simple = scopeProjectSimpleNames(project, ChooseByNameContributor.CLASS_EP_NAME.extensionList.toList())
         // Source-file base names (without extension) so Kotlin file facades — top-level-function files with
         // no enclosing class (e.g. `YoloNavigation.kt`) — are still recognized as project references and can
         // be linked to the file. Restricted to content roots and a code-extension allowlist, matching the
@@ -140,4 +127,36 @@ object YoloProjectTypes {
         }
         return Snapshot(simple, files, fileMap)
     }
+}
+
+/**
+ * Collects project-content-root type simple names from the given [contributors] for [project].
+ *
+ * A name is admitted to the set only if it resolves to a *project-scope* (content-root) item via
+ * `getItemsByName(name, name, project, false)` — the same project-only check [resolveType][YoloNavigation]
+ * uses on click. This second pass is mandatory: `getNames(project, false)` is SCOPE-BLIND for several
+ * language contributors (Java's `AllClassesContributor` returns every indexed class short name — project
+ * + libraries + JDK — and ignores the `includeNonProjectItems` flag). Feeding `getNames` straight into the
+ * gate links ubiquitous types (`String`, `List`, …) and ordinary capitalized words that merely coincide
+ * with a class name somewhere (`Now`, `Wait`, `Result`, …) — the "paint every capitalized word blue"
+ * behaviour users report. The extra `getItemsByName` pass restores the "content roots only" gate the
+ * filters rely on, while the qualified-name gate still works because a qualified project symbol's trailing
+ * segment is now in the set.
+ *
+ * Pure and side-effect free (takes the contributor list explicitly) so it can be unit-tested with a fake
+ * [ChooseByNameContributor] — no live project or indices required. [project] is nullable only to permit
+ * that offline test seam; production callers always pass a real project.
+ */
+fun scopeProjectSimpleNames(project: Project?, contributors: List<ChooseByNameContributor>): Set<String> {
+    val simple = mutableSetOf<String>()
+    for (contributor in contributors) {
+        val names = runCatching { contributor.getNames(project, false) }.getOrNull() ?: continue
+        for (name in names) {
+            val projectItems = runCatching {
+                contributor.getItemsByName(name, name, project, false)
+            }.getOrNull()
+            if (!projectItems.isNullOrEmpty()) simple.add(name)
+        }
+    }
+    return simple
 }
