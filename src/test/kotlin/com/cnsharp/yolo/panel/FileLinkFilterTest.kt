@@ -198,4 +198,27 @@ class FileLinkFilterTest {
         // Two independent references on one line each become their own link.
         assertEquals(listOf("src/a/Foo.kt", "src/b/Bar.java"), linked("edit src/a/Foo.kt and src/b/Bar.java"))
     }
+
+    // ---- Regression: the resolved path must not double-append the extension ----
+    // A [PATH_PATTERN] match's group 1 already contains the extension, so the target is just `raw`.
+    // Historically the code re-appended `.${ext}`, producing `src/main/Foo.kt.kt`, which [resolve] could
+    // never find — the link showed up but clicking navigated nowhere ("不能准确定位到", e.g. a
+    // `.venus/…tsv` reference that never opened). These assertions fail if the re-append is reintroduced.
+    @Test
+    fun testResolvedPathHasNoDoubleExtension() {
+        assertEquals("src/main/Foo.kt", fileLinkTarget("src/main/Foo.kt", "kt"))
+        assertEquals(".venus/venus_marked_delete_order_test1_20260819_155241.tsv",
+            fileLinkTarget(".venus/venus_marked_delete_order_test1_20260819_155241.tsv", "tsv"))
+        assertEquals("/abs/Bar.java", fileLinkTarget("/abs/Bar.java", "java"))
+        // No-extension match (carried by `:line`): target is the raw path as-is.
+        assertEquals("./Makefile", fileLinkTarget("./Makefile", null))
+    }
+
+    @Test
+    fun testUnquotedPathResolvesToSingleExtension() {
+        // End-to-end detection check: a relative `.tsv` reference links as the exact single-extension path
+        // (no doubled `.tsv.tsv`), so `resolve` is given a path that actually exists.
+        val ref = ".venus/venus_marked_delete_order_test1_20260819_155241.tsv"
+        assertEquals(listOf(ref), linked("see $ref here"))
+    }
 }

@@ -91,8 +91,9 @@ class FileLinkFilter(
             if (raw.contains('…') || raw.contains("...") || isTruncatedPath(text, m.end(1))) continue
             val line = m.group(3)?.toIntOrNull()
             val column = m.group(5)?.toIntOrNull()
-            // group(1) is the path without its extension; re-attach it for resolution (m.group(2) is nullable).
-            val fullPath = raw + (m.group(2)?.let { ".$it" } ?: "")
+            // group(1) already carries the full path *including* its extension; just hand it to [resolve].
+            // (Historically this re-appended `.${group(2)}`, yielding a doubled `Foo.kt.kt` that never resolved.)
+            val fullPath = fileLinkTarget(raw, m.group(2))
             // Resolution is deferred to click time (see resolve) so streaming output is never blocked by
             // index/PSI queries on the terminal emulator thread.
             val link = yoloHyperlink(project) {
@@ -139,3 +140,11 @@ class FileLinkFilter(
         }
     }
 }
+
+/**
+ * The file path to open for an unquoted [PATH_PATTERN] match. [raw] is group 1 — the full path *including*
+ * its extension — and [ext] is group 2 (the bare extension, or null when the match has no extension but a
+ * `:line`). [raw] already carries the extension, so it is returned unchanged: never re-append `.` + [ext],
+ * or [resolve] would look for a doubled `Foo.kt.kt` and find nothing.
+ */
+internal fun fileLinkTarget(raw: String, ext: String?): String = raw
