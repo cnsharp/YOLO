@@ -6,7 +6,7 @@ click. What makes it different: **everything the agent prints becomes clickable*
 and URLs all turn into navigation links — so you can jump from the agent's output straight to the code.
 
 It is built entirely on **public IntelliJ APIs**, so it passes JetBrains Marketplace verification and can be published
-like any normal plugin. It does **not** hook into or depend on IDEA's Terminal plugin.
+like any normal plugin. It does **not** hook into or depend on IDEA's built-in Terminal.
 
 
 ---
@@ -20,7 +20,7 @@ like any normal plugin. It does **not** hook into or depend on IDEA's Terminal p
 A tool window (right side, **y** icon) that replicates the Terminal's **AI Agents** experience without touching
 any internal Terminal API:
 
-- Lists your **installed** agents — promoted agents (Claude Code, Codex, CodeBuddy, …) plus your own custom tools.
+- Lists your **installed** agents — promoted agents (Claude Code, Codex, CodeBuddy, ZCode, …) plus your own custom tools.
   Agents that aren't detected on `PATH` simply aren't shown, so the list stays relevant to this machine.
 - Each row shows the agent's icon, name, and its configured skip flag.
 - The dropdown loads **instantly from a cached install scan** — the detection done on a previous run is reused, and a
@@ -95,7 +95,7 @@ right place and **auto-hides the YOLO panel** so it no longer covers the editor.
 | | |
 |---|---|
 | IDE | IntelliJ IDEA **2023.3** (build `233`) or later |
-| Dependencies | None beyond the IntelliJ Platform itself — the Terminal plugin is **not** required |
+| Dependencies | None beyond the IntelliJ Platform itself — the built-in Terminal is **not** required |
 
 ---
 
@@ -147,7 +147,7 @@ It is "experimental" because it hooks **internal** Terminal extension points
 | APIs used | Public IntelliJ APIs only | Internal Terminal APIs |
 | Marketplace | Published | **Not published** (fails verification) |
 | Min. IDE version | 2023.3 (`233`) | 2026.1 (`261`) |
-| IDE family | All IntelliJ-platform IDEs | IntelliJ IDEA (Terminal plugin required) |
+| IDE family | All IntelliJ-platform IDEs | IntelliJ IDEA |
 
 ### How to get it
 
@@ -228,6 +228,7 @@ source of truth. What runs is whatever the settings say.
 | Kilo Code | `kilo` | none — only `kilo run` accepts one |
 | OpenClaw | `openclaw` | none — persistent config only |
 | Pi | `pi` | `--approve` |
+| ZCode | `zcode` | none — no launch-time bypass flag |
 
 Anything not listed here works fine as a custom tool; just fill in its flag yourself.
 

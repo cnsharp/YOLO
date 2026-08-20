@@ -6,7 +6,7 @@
 让你能从智能体的输出直接跳转到对应代码。
 
 它完全基于 **IntelliJ 公开 API** 构建,因此能通过 JetBrains 官方市场审核,可以像普通插件一样发布。
-它**没有**接入或依赖 IDEA 自带的 Terminal 插件。
+它**没有**接入或依赖 IDEA 内置的 Terminal。
 
 ---
 
@@ -18,7 +18,7 @@
 
 一个工具窗口(右侧,**y** 图标),在不触碰任何内部 Terminal API 的前提下,复刻了 Terminal 的 **AI Agents** 体验:
 
-- 列出你**已安装**的智能体 —— 包括官方推荐的智能体(Claude Code、Codex、CodeBuddy……)以及你自己的自定义工具。
+- 列出你**已安装**的智能体 —— 包括官方推荐的智能体(Claude Code、Codex、CodeBuddy、ZCode……)以及你自己的自定义工具。
   在 `PATH` 上检测不到的智能体不会显示,因此列表始终与当前机器相关。
 - 每一行显示智能体的图标、名称以及其配置的跳过(skip)标志。
 - 下拉列表从**已缓存的安装扫描结果**瞬间加载 —— 复用上一次运行所做的检测,只有当已安装智能体的集合真正发生变化时,
@@ -88,7 +88,7 @@ Claude Code 是 `--dangerously-skip-permissions`,Codex 是 `--yolo`,CodeBuddy �
 | | |
 |---|---|
 | IDE | IntelliJ IDEA **2023.3**(构建号 `233`)或更高版本 |
-| 依赖 | 除 IntelliJ 平台本身外无其他依赖 —— **不需要** Terminal 插件 |
+| 依赖 | 除 IntelliJ 平台本身外无其他依赖 —— **无需** IDEA 内置 Terminal |
 
 ---
 
@@ -138,7 +138,7 @@ localIdeaPath=/Applications/IntelliJ IDEA.app
 | 所用 API | 仅公开 IntelliJ API | 内部 Terminal API |
 | 市场发布 | 已发布 | **未发布**(无法通过审核) |
 | 最低 IDE 版本 | 2023.3(`233`) | 2026.1(`261`) |
-| IDE 家族 | 所有 IntelliJ 平台 IDE | IntelliJ IDEA(需 Terminal 插件) |
+| IDE 家族 | 所有 IntelliJ 平台 IDE | IntelliJ IDEA |
 
 ### 如何获取
 
@@ -178,7 +178,7 @@ localIdeaPath=/Applications/IntelliJ IDEA.app
 
 行分两种,按优先级从高到低排列:
 
-1. **推荐智能体**(Claude Code、Codex、CodeBuddy……)—— 只读,且 **Claude Code** 和 **Codex** 固定在最上方,不可删除。
+1. **推荐智能体**(Claude Code、Codex、CodeBuddy、ZCode……)—— 只读,且 **Claude Code** 和 **Codex** 固定在最上方,不可删除。
 2. **你自己的自定义工具** —— 完全可编辑,按你创建的顺序排列。
 
 推荐智能体上只有跳过标志可编辑。这是有意为之:插件应当扩展面板,而不是接管它。
@@ -212,6 +212,7 @@ localIdeaPath=/Applications/IntelliJ IDEA.app
 | Kilo Code | `kilo` | 无 —— 仅 `kilo run` 接受 |
 | OpenClaw | `openclaw` | 无 —— 仅持久配置 |
 | Pi | `pi` | `--approve` |
+| ZCode | `zcode` | 无 —— 无启动期跳过标志 |
 
 任何未列出的工具都可以作为自定义工具正常使用;只需自己填好它的标志即可。
 
