@@ -62,4 +62,40 @@ class StackTraceLinkFilterTest {
         // Only `…`/`...` suppresses a bare name; an ordinary (non-separator) preceding char must not.
         assertEquals(listOf("Bar.java"), linked("shown in (Bar.java) frame"))
     }
+
+    @Test
+    fun testHyphenatedPathTailIsNotBareFrame() {
+        // `service.xml:387` is the *tail* of the hyphenated file `dubbo-service.xml`, not a standalone
+        // stack-trace frame. The `-` before `service` is part of the file name, so it must not be linked as
+        // a bare frame — otherwise it overlaps the full-path link from FileLinkFilter and the reference
+        // renders split at the 2nd hyphen (the reported `app/biz/service-impl/.../dubbo-service.xml:387` bug).
+        assertTrue(linked("app/biz/service-impl/src/main/resources/dubbo-service.xml:387").isEmpty())
+    }
+
+    @Test
+    fun testHyphenatedBareFileNameStillLinks() {
+        // A genuine bare frame whose file name itself contains a hyphen is still a real frame and must link.
+        // Here the char before the name is `(` / a space (not `-`), so the lookbehind passes.
+        assertEquals(listOf("dubbo-service.xml:387"), linked("at com.foo.Bar.run(dubbo-service.xml:387)"))
+        assertEquals(listOf("dubbo-service.xml"), linked("see dubbo-service.xml now"))
+    }
+
+    @Test
+    fun testHyphenatedPathTailIsNotBareNameFile() {
+        // `batch-timing_uat_...tsv` is the *tail* of the hyphenated file
+        // `venus_unused_app_order-batch-timing_uat_...tsv`, not a standalone bare file name. The `-` before
+        // `batch` is part of the file name, so the bare-name pattern must not link it — otherwise it overlaps
+        // FileLinkFilter's full-path link and the reference splits at the 1st `-` (the reported
+        // `.venus/venus_unused_app_order-batch-timing_uat_...tsv` case, which has no `:line`).
+        assertTrue(linked(".venus/venus_unused_app_order-batch-timing_uat_20260820_144426.tsv").isEmpty())
+    }
+
+    @Test
+    fun testHyphenatedBareFileNameWithHyphensStillLinks() {
+        // A genuine bare file name that itself contains hyphens must still link as a whole.
+        assertEquals(
+            listOf("venus_unused_app_order-batch-timing_uat_20260820_144426.tsv"),
+            linked("see venus_unused_app_order-batch-timing_uat_20260820_144426.tsv now")
+        )
+    }
 }
