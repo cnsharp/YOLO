@@ -93,7 +93,7 @@ internal val QUOTED_PATH_PATTERN: Pattern = Pattern.compile(
  * **Groups:** 1 = file, 2 = line, 3 = column.
  */
 internal val STACK_BARE_PATTERN: Pattern = Pattern.compile(
-    """(?<![\\/\w.])([\w.\-]+\.(?i:$PROGRAMMING_EXT)):(\d+)(?::(\d+))?"""
+    """(?<![\\/\w.\-])([\w.\-]+\.(?i:$PROGRAMMING_EXT)):(\d+)(?::(\d+))?"""
 )
 
 /**
@@ -105,7 +105,7 @@ internal val STACK_BARE_PATTERN: Pattern = Pattern.compile(
  * **Groups:** 1 = file.
  */
 internal val STACK_BARE_NAME_PATTERN: Pattern = Pattern.compile(
-    """(?<![\\/\w.])([\w.\-]+\.(?i:$PROGRAMMING_EXT))(?![\\/\w.:])"""
+    """(?<![\\/\w.\-])([\w.\-]+\.(?i:$PROGRAMMING_EXT))(?![\\/\w.:])"""
 )
 
 /** Python traceback `File "path", line N` (double-quoted). **Groups:** 1 = file, 2 = line. */
