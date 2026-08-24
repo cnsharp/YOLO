@@ -387,8 +387,8 @@ class AgentExtenderConfigurable : Configurable {
         val command = (toolsModel.getValueAt(row, COL_COMMAND) as? String)?.trim() ?: ""
         val current = (toolsModel.getValueAt(row, COL_SKIP) as? String)?.trim() ?: ""
         if (current.isNotEmpty()) return
-        val byCmd = if (command.isNotBlank()) DefaultSkipFlags.forId(baseName(command)) else ""
-        val resolved = if (byCmd.isNotEmpty()) byCmd else DefaultSkipFlags.forId(id)
+        val byCmd = if (command.isNotBlank()) AgentRegistry.skipFlagFor(baseName(command)) else ""
+        val resolved = if (byCmd.isNotEmpty()) byCmd else AgentRegistry.skipFlagFor(id)
         if (resolved.isNotEmpty()) {
             autoFilling = true
             try {
@@ -522,20 +522,20 @@ class AgentExtenderConfigurable : Configurable {
             fun flagFor(cmd: String, id: String = ""): String {
                 val saved = ruleByCmd[baseName(cmd).lowercase()]
                 if (!saved.isNullOrBlank()) return@flagFor saved
-                return DefaultSkipFlags.forId(baseName(cmd)).ifBlank {
-                    DefaultSkipFlags.forId(id)
+                return AgentRegistry.skipFlagFor(baseName(cmd)).ifBlank {
+                    AgentRegistry.skipFlagFor(id)
                 }
             }
 
             // ① Promoted by this plugin (e.g. claude/codex/codebuddy): in PromotedAgents.entries order (Claude Code, Codex pinned Top 2),
             //    read-only, not removable, icon fixed.
-            promotedIds = PromotedAgents.entries.map { it.id.lowercase() }.toSet()
-            for (meta in PromotedAgents.entries) {
-                val baseArgs = state.agentBaseArgs[meta.id.lowercase()] ?: ""
+            promotedIds = AgentRegistry.agents.map { it.id.lowercase() }.toSet()
+            for (def in AgentRegistry.agents) {
+                val baseArgs = state.agentBaseArgs[def.id.lowercase()] ?: ""
                 toolsModel.addRow(
                     arrayOf<Any>(
-                        "", meta.id, meta.displayName, meta.command,
-                        baseArgs, flagFor(meta.command, meta.id), ""
+                        "", def.id, def.displayName, def.command,
+                        baseArgs, flagFor(def.command, def.id), ""
                     )
                 )
             }
