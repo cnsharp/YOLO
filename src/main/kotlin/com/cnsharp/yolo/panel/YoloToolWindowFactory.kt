@@ -362,12 +362,15 @@ private class YoloPanel(
 
         // Inherit the OS environment and inject any env-based bypass (e.g. goose's GOOSE_MODE).
         val env = HashMap(System.getenv())
-        if (settings.skipEnabled && row.skipFlag.isNotBlank()) {
+        val envPair = AgentRegistry.skipEnvFor(baseName(row.command))
+        if (settings.skipEnabled && (row.skipFlag.isNotBlank() || envPair != null)) {
             // The flag may be multiple tokens (e.g. cline's "--auto-approve true"), so it must be split into
             // separate argv entries; otherwise it becomes one space-containing argument that cannot be parsed.
-            val tokens = row.skipFlag.split(' ').filter { it.isNotBlank() }
-            if (tokens.isNotEmpty() && tokens[0] !in cmd) cmd += tokens
-            AgentRegistry.skipEnvFor(baseName(row.command))?.let { (name, value) -> env[name] = value }
+            if (row.skipFlag.isNotBlank()) {
+                val tokens = row.skipFlag.split(' ').filter { it.isNotBlank() }
+                if (tokens.isNotEmpty() && tokens[0] !in cmd) cmd += tokens
+            }
+            envPair?.let { (name, value) -> env[name] = value }
         }
 
         val shellCmd = cmd.joinToString(" ")
