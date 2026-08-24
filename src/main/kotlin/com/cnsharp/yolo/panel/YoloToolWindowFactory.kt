@@ -4,11 +4,9 @@ import com.cnsharp.yolo.YoloBundle.message
 import com.cnsharp.yolo.launcher.SkipPermissionsAction
 import com.cnsharp.yolo.settings.AgentExtenderSettings
 import com.cnsharp.yolo.settings.AgentExtenderSettingsListener
+import com.cnsharp.yolo.settings.AgentRegistry
 import com.cnsharp.yolo.settings.InstalledAgents
-import com.cnsharp.yolo.settings.DefaultSkipEnvs
-import com.cnsharp.yolo.settings.DefaultSkipFlags
 import com.cnsharp.yolo.settings.OpenSettingsAction
-import com.cnsharp.yolo.settings.PromotedAgents
 import com.cnsharp.yolo.terminal.AgentIcons
 import com.cnsharp.yolo.util.baseName
 import com.cnsharp.yolo.YoloConstants
@@ -313,7 +311,7 @@ private class YoloPanel(
         fun flagFor(cmd: String, id: String): String {
             val saved = ruleByCmd[baseName(cmd).lowercase()]
             if (!saved.isNullOrBlank()) return saved
-            return DefaultSkipFlags.forId(baseName(cmd)).ifBlank { DefaultSkipFlags.forId(id) }
+            return AgentRegistry.skipFlagFor(baseName(cmd)).ifBlank { AgentRegistry.skipFlagFor(id) }
         }
 
         // Collect into a list, but skip any row whose (non-blank) command was already seen — promoted agents
@@ -329,9 +327,9 @@ private class YoloPanel(
         // real agent, so it launches nothing — this also prevents the first real agent from auto-launching
         // when the panel opens and selectedIndex is set programmatically.
         addUnique(AgentRow("", message("panel.agentsPrompt"), "", "", "", ""))
-        for (meta in PromotedAgents.entries) {
-            val baseArgs = settings.agentBaseArgs[meta.id.lowercase()] ?: ""
-            addUnique(AgentRow(meta.id, meta.displayName, meta.command, baseArgs, flagFor(meta.command, meta.id), ""))
+        for (def in AgentRegistry.agents) {
+            val baseArgs = settings.agentBaseArgs[def.id.lowercase()] ?: ""
+            addUnique(AgentRow(def.id, def.displayName, def.command, baseArgs, flagFor(def.command, def.id), ""))
         }
         for (tool in settings.customTools) {
             addUnique(
@@ -369,7 +367,7 @@ private class YoloPanel(
             // separate argv entries; otherwise it becomes one space-containing argument that cannot be parsed.
             val tokens = row.skipFlag.split(' ').filter { it.isNotBlank() }
             if (tokens.isNotEmpty() && tokens[0] !in cmd) cmd += tokens
-            DefaultSkipEnvs.forId(baseName(row.command))?.let { (name, value) -> env[name] = value }
+            AgentRegistry.skipEnvFor(baseName(row.command))?.let { (name, value) -> env[name] = value }
         }
 
         val shellCmd = cmd.joinToString(" ")
