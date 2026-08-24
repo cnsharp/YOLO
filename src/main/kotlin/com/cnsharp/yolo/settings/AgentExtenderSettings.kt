@@ -50,6 +50,8 @@ object DefaultSkipFlags {
         // kilo: only 'kilo run' accepts --dangerously-skip-permissions; bare TUI does not.
         // openclaw: only persistent config ('openclaw exec-policy preset yolo').
         // pi: --approve trusts project-local files (AGENTS.md/SYSTEM.md/skills) for this run.
+        // trae: ACP protocol, no skip flag needed.
+        "trae"      to "",                // trae: ACP protocol, no skip flag needed
     )
     /** Returns the flag string, or empty if no known flag exists for this binary. */
     fun forId(id: String): String = map[id.lowercase()] ?: ""
@@ -93,7 +95,8 @@ object PromotedAgents {
         Meta("opencode",  "OpenCode", "opencode"),
         Meta("pi",        "Pi",       "pi"),
         Meta("qoder",     "Qoder",    "qoder"),
-        Meta("zcode",     "ZCode",    "zcode")   // https://zcode.z.ai/
+        Meta("trae",      "TraeCode", "traecli"),
+        Meta("zcode",     "ZCode",    "zcode")
     )
 }
 
