@@ -1,0 +1,129 @@
+[
+  {
+    "id": "claude",
+    "displayName": "Claude Code",
+    "command": "claude",
+    "skipFlag": "--dangerously-skip-permissions",
+    "icon": "/icons/agents/claude.png"
+  },
+  {
+    "id": "codex",
+    "displayName": "Codex",
+    "command": "codex",
+    "skipFlag": "--yolo",
+    "icon": "/icons/agents/codex.svg"
+  },
+  {
+    "id": "cline",
+    "displayName": "Cline",
+    "command": "cline",
+    "skipFlag": "--auto-approve true",
+    "icon": "/icons/agents/cline.png"
+  },
+  {
+    "id": "codebuddy",
+    "displayName": "CodeBuddy",
+    "command": "codebuddy",
+    "skipFlag": "-y",
+    "icon": "/icons/agents/codebuddy.svg"
+  },
+  {
+    "id": "continue",
+    "displayName": "Continue",
+    "command": "cn",
+    "skipFlag": "--auto",
+    "icon": "/icons/agents/continue.png"
+  },
+  {
+    "id": "copilot",
+    "displayName": "Copilot",
+    "command": "copilot",
+    "skipFlag": "--allow-all",
+    "icon": "/icons/agents/copilot.svg"
+  },
+  {
+    "id": "cursor",
+    "displayName": "Cursor",
+    "command": "cursor-agent",
+    "skipFlag": "--force",
+    "icon": "/icons/agents/cursor.png"
+  },
+  {
+    "id": "gemini",
+    "displayName": "Gemini",
+    "command": "gemini",
+    "skipFlag": "--yolo",
+    "icon": "/icons/agents/gemini.png"
+  },
+  {
+    "id": "goose",
+    "displayName": "Goose",
+    "command": "goose",
+    "skipFlag": "",
+    "skipEnv": { "name": "GOOSE_MODE", "value": "auto" },
+    "icon": "/icons/agents/goose.png"
+  },
+  {
+    "id": "hermes",
+    "displayName": "Hermes",
+    "command": "hermes",
+    "skipFlag": "--yolo",
+    "icon": "/icons/agents/hermes.png"
+  },
+  {
+    "id": "kilo",
+    "displayName": "Kilo Code",
+    "command": "kilo",
+    "skipFlag": "",
+    "icon": "/icons/agents/kilo.svg"
+  },
+  {
+    "id": "kimi",
+    "displayName": "Kimi",
+    "command": "kimi",
+    "skipFlag": "--yolo",
+    "icon": "/icons/agents/kimi.png"
+  },
+  {
+    "id": "openclaw",
+    "displayName": "OpenClaw",
+    "command": "openclaw",
+    "skipFlag": "",
+    "icon": "/icons/agents/openclaw.svg"
+  },
+  {
+    "id": "opencode",
+    "displayName": "OpenCode",
+    "command": "opencode",
+    "skipFlag": "--auto",
+    "icon": "/icons/agents/opencode.png"
+  },
+  {
+    "id": "pi",
+    "displayName": "Pi",
+    "command": "pi",
+    "skipFlag": "--approve",
+    "icon": "/icons/agents/pi.svg"
+  },
+  {
+    "id": "qoder",
+    "displayName": "Qoder",
+    "command": "qoder",
+    "skipFlag": "--dangerously-skip-permissions",
+    "icon": "/icons/agents/qoder.svg"
+  },
+  {
+    "id": "trae",
+    "displayName": "TraeCode",
+    "command": "traecli",
+    "skipFlag": "",
+    "icon": "/icons/agents/trae.svg"
+  },
+  {
+    "id": "zcode",
+    "displayName": "ZCode",
+    "command": "zcode",
+    "skipFlag": "",
+    "icon": "/icons/agents/zcode.png"
+  }
+]
