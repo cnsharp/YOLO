@@ -45,7 +45,8 @@ object AgentIcons {
         "goose"     to "/icons/agents/goose.png",
         "openclaw"  to "/icons/agents/openclaw.svg",
         "pi"        to "/icons/agents/pi.svg",
-        "zcode"     to "/icons/agents/zcode.png"
+        "zcode"     to "/icons/agents/zcode.png",
+        "trae"      to "/icons/agents/trae.svg"
     )
 
     /** y icon for the Skip permissions checkbox (off/on). */
