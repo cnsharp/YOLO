@@ -3,7 +3,6 @@ package com.cnsharp.yolo.panel
 import com.intellij.navigation.ChooseByNameContributor
 import com.intellij.navigation.GotoClassContributor
 import com.intellij.navigation.NavigationItem
-import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
@@ -39,12 +38,10 @@ internal fun lastTypeNameSegment(name: String): String {
 
 /** Open a file in the IDE editor at the given 1-based line/column (converted to 0-based internally). */
 internal fun openFileAt(project: Project, file: File, line: Int?, column: Int?) {
-    runReadAction {
-        val vFile = LocalFileSystem.getInstance().findFileByIoFile(file) ?: return@runReadAction
-        // OpenFileDescriptor uses 0-based line/column; agent output is 1-based.
-        val descriptor = OpenFileDescriptor(project, vFile, (line ?: 1) - 1, (column ?: 1) - 1)
-        FileEditorManager.getInstance(project).openTextEditor(descriptor, true)
-    }
+    val vFile = LocalFileSystem.getInstance().findFileByIoFile(file) ?: return
+    // OpenFileDescriptor uses 0-based line/column; agent output is 1-based.
+    val descriptor = OpenFileDescriptor(project, vFile, (line ?: 1) - 1, (column ?: 1) - 1)
+    FileEditorManager.getInstance(project).openTextEditor(descriptor, true)
 }
 
 /**
@@ -55,7 +52,7 @@ internal fun openFileAt(project: Project, file: File, line: Int?, column: Int?) 
  * index/backend is still warming up (e.g. Rider's ReSharper-backed C# contributor) — those are simply
  * skipped so the terminal never blocks.
  */
-internal fun resolveType(project: Project, name: String): NavigationItem? = runReadAction {
+internal fun resolveType(project: Project, name: String): NavigationItem? {
     val target = normalizeTypeName(name)
     val lastSeg = lastTypeNameSegment(name)
     val qualifiedQuery = isQualifiedName(name)
@@ -70,16 +67,16 @@ internal fun resolveType(project: Project, name: String): NavigationItem? = runR
             val qn = (contributor as? GotoClassContributor)?.getQualifiedName(item)
             if (qn != null) {
                 // Exact or separator-normalized qualified match.
-                if (qn == name || normalizeTypeName(qn) == target) return@runReadAction item
+                if (qn == name || normalizeTypeName(qn) == target) return item
                 // Simple-name query: match by the item's simple (last) segment.
-                if (!qualifiedQuery && lastTypeNameSegment(qn) == name) return@runReadAction item
+                if (!qualifiedQuery && lastTypeNameSegment(qn) == name) return item
             } else if (!qualifiedQuery) {
                 // Contributor without a qualified name still satisfies a simple-name query.
-                return@runReadAction item
+                return item
             }
         }
     }
-    null
+    return null
 }
 
 /**
@@ -102,18 +99,17 @@ internal fun openNavigationItem(item: NavigationItem) {
  *
  * Must be called inside a read action.
  */
-internal fun resolveMember(project: Project, classItem: NavigationItem, member: String): NavigationItem? =
-    runReadAction {
-        val classFile = (classItem as? PsiElement)?.containingFile?.virtualFile ?: return@runReadAction null
-        for (contributor in ChooseByNameContributor.SYMBOL_EP_NAME.extensionList) {
-            val items = runCatching {
-                contributor.getItemsByName(member, member, project, false)
-            }.getOrNull() ?: continue
-            for (item in items) {
-                // Prefer a symbol declared in the same file as the class (a project member, not an inherited one).
-                val itemFile = (item as? PsiElement)?.containingFile?.virtualFile
-                if (itemFile != null && itemFile == classFile) return@runReadAction item
-            }
+internal fun resolveMember(project: Project, classItem: NavigationItem, member: String): NavigationItem? {
+    val classFile = (classItem as? PsiElement)?.containingFile?.virtualFile ?: return null
+    for (contributor in ChooseByNameContributor.SYMBOL_EP_NAME.extensionList) {
+        val items = runCatching {
+            contributor.getItemsByName(member, member, project, false)
+        }.getOrNull() ?: continue
+        for (item in items) {
+            // Prefer a symbol declared in the same file as the class (a project member, not an inherited one).
+            val itemFile = (item as? PsiElement)?.containingFile?.virtualFile
+            if (itemFile != null && itemFile == classFile) return item
         }
-        null
     }
+    return null
+}

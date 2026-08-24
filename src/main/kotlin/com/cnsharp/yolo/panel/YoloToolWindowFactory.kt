@@ -46,6 +46,7 @@ import java.awt.Font
 import java.awt.Rectangle
 import java.awt.KeyboardFocusManager
 import java.awt.Toolkit
+import java.awt.AWTEvent
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.beans.PropertyChangeListener
@@ -190,7 +191,7 @@ private class YoloPanel(
      * change the component's pixel size, so JediTerm never recomputes its grid and its cached image goes
      * stale — leaving ghost artifacts. We force a recompute ourselves.
      */
-    private val scaleChangeListener = PropertyChangeListener { (currentWidget as? YoloJediTermWidget)?.forceReinitFull() }
+    private val scaleChangeListener = PropertyChangeListener { currentWidget?.forceReinitFull() }
 
     /**
      * Intercepts Ctrl+C while the embedded terminal has focus so the keystroke reaches the PTY as SIGINT
@@ -207,25 +208,27 @@ private class YoloPanel(
      * Only the real terminal panel is affected — the dropdown, toolbar and the rest of the IDE keep their
      * normal Ctrl+C behavior. ⌘C (macOS Copy) is left untouched because we require a plain Ctrl modifier.
      */
-    private val ctrlCDispatcher = IdeEventQueue.EventDispatcher { event ->
-        if (event !is KeyEvent || event.id != KeyEvent.KEY_PRESSED) return@EventDispatcher false
-        // Plain Ctrl+C only — no Shift/Alt/Meta. Meta (⌘) is left to IDEA's Copy on macOS.
-        val mods = event.modifiersEx and
-            (InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK or InputEvent.ALT_DOWN_MASK or InputEvent.META_DOWN_MASK)
-        if (mods != InputEvent.CTRL_DOWN_MASK || event.keyCode != KeyEvent.VK_C) return@EventDispatcher false
+    private val ctrlCDispatcher = object : IdeEventQueue.NonLockedEventDispatcher {
+        override fun dispatch(e: AWTEvent): Boolean {
+            if (e !is KeyEvent || e.id != KeyEvent.KEY_PRESSED) return false
+            // Plain Ctrl+C only — no Shift/Alt/Meta. Meta (⌘) is left to IDEA's Copy on macOS.
+            val mods = e.modifiersEx and
+                (InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK or InputEvent.ALT_DOWN_MASK or InputEvent.META_DOWN_MASK)
+            if (mods != InputEvent.CTRL_DOWN_MASK || e.keyCode != KeyEvent.VK_C) return false
 
-        val panel = currentWidget?.getTerminalPanel() ?: return@EventDispatcher false
-        val focus = KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner ?: return@EventDispatcher false
-        if (!SwingUtilities.isDescendingFrom(focus, panel)) return@EventDispatcher false
+            val panel = currentWidget?.getTerminalPanel() ?: return false
+            val focus = KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner ?: return false
+            if (!SwingUtilities.isDescendingFrom(focus, panel)) return false
 
-        // Consume before IDEA's action system sees it, then deliver the key to JediTerm ourselves.
-        event.consume()
-        val forward = KeyEvent(
-            panel, KeyEvent.KEY_PRESSED, System.currentTimeMillis(),
-            InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_C, 'c'
-        )
-        panel.processKeyEvent(forward)
-        true
+            // Consume before IDEA's action system sees it, then deliver the key to JediTerm ourselves.
+            e.consume()
+            val forward = KeyEvent(
+                panel, KeyEvent.KEY_PRESSED, System.currentTimeMillis(),
+                InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_C, 'c'
+            )
+            panel.processKeyEvent(forward)
+            return true
+        }
     }
 
     init {

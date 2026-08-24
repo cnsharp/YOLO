@@ -2,7 +2,7 @@ package com.cnsharp.yolo.panel
 
 import com.intellij.navigation.ChooseByNameContributor
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.runReadAction
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.project.ProjectManagerListener
@@ -90,7 +90,8 @@ object YoloProjectTypes {
         if (cache.modCount != modCount && cache.refreshScheduled.compareAndSet(false, true)) {
             ApplicationManager.getApplication().executeOnPooledThread {
                 try {
-                    val built = runReadAction { build(project) }
+                    @Suppress("DEPRECATION")
+                    val built = ReadAction.compute<Snapshot, Exception> { build(project) }
                     cache.snapshot = built
                     cache.modCount = modCount
                 } finally {
@@ -117,7 +118,7 @@ object YoloProjectTypes {
                 val ext = vf.extension
                 if (ext != null && ext in SOURCE_FILE_EXT) {
                     val base = vf.nameWithoutExtension
-                    if (base != null && base.isNotEmpty()) {
+                    if (base.isNotEmpty()) {
                         files.add(base)
                         fileMap.putIfAbsent(base, vf)
                     }

@@ -1,6 +1,5 @@
 package com.cnsharp.yolo.panel
 
-import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
 import com.jediterm.terminal.model.hyperlinks.HyperlinkFilter
@@ -110,8 +109,8 @@ class FileLinkFilter(
 
     /** Resolve a possibly-relative path against the agent's working dir and the project's content roots.
      *  Called from the click handler (EDT), wrapped in a read action because it touches the project model. */
-    private fun resolve(raw: String): File? = runReadAction {
-        val project = this.project ?: return@runReadAction null
+    private fun resolve(raw: String): File? {
+        val project = this.project ?: return null
         val candidates = mutableListOf<File>()
         when {
             raw.startsWith("file://") -> candidates += File(raw.removePrefix("file://"))
@@ -123,7 +122,7 @@ class FileLinkFilter(
         for (root in ProjectRootManager.getInstance(project).contentRoots) {
             candidates += File(root.path, raw)
         }
-        candidates.firstOrNull { it.isFile }
+        return candidates.firstOrNull { it.isFile }
     }
 
     companion object {
