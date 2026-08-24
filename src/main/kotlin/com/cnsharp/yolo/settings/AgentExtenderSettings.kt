@@ -26,78 +26,12 @@ data class CustomTool(
     var iconPath: String = ""
 )
 
-/** Default skip-permission flags per agent (convenience prefill only; IDEA itself does not expose this info).
- *  Agents not in the table are not auto-prefilled; the user adds them manually in the permission rules table. */
-object DefaultSkipFlags {
-    private val map: Map<String, String> = mapOf(
-        // IDEA built-in agents
-        "junie"     to "--dangerously-skip-permissions",
-        "claude"    to "--dangerously-skip-permissions",
-        "codex"     to "--yolo",
-        // Promoted / custom agents with a launch-time permission-bypass flag
-        "codebuddy" to "-y",
-        "gemini"    to "--yolo",
-        "copilot"   to "--allow-all",
-        "cursor-agent" to "--force",
-        "kimi"      to "--yolo",
-        "qoder"     to "--dangerously-skip-permissions",
-        "hermes"    to "--yolo",
-        "opencode"  to "--auto",
-        "pi"        to "--approve",        // pi: trust project-local files for this run
-        "cn"        to "--auto",           // continue binary is 'cn'
-        "cline"     to "--auto-approve true",
-        // Agents below have no launch-time bypass flag; see DefaultSkipEnvs for env-based ones.
-        // kilo: only 'kilo run' accepts --dangerously-skip-permissions; bare TUI does not.
-        // openclaw: only persistent config ('openclaw exec-policy preset yolo').
-        // pi: --approve trusts project-local files (AGENTS.md/SYSTEM.md/skills) for this run.
-        // trae: ACP protocol, no skip flag needed.
-        "trae"      to "",                // trae: ACP protocol, no skip flag needed
-    )
-    /** Returns the flag string, or empty if no known flag exists for this binary. */
-    fun forId(id: String): String = map[id.lowercase()] ?: ""
-}
-
-/** Agents whose permission bypass is an environment variable instead of a CLI flag.
- *  An env var must be exported before the process starts — it cannot be appended to
- *  the command line, where it would become a positional argument. */
-object DefaultSkipEnvs {
-    private val map: Map<String, Pair<String, String>> = mapOf(
-        "goose" to ("GOOSE_MODE" to "auto")
-    )
-    fun forId(id: String): Pair<String, String>? = map[id.lowercase()]
-}
-
 /** IDEA's built-in agents: dynamically taken from TerminalAgentProvider (excluding this plugin's own provider).
  *  When an IDEA upgrade adds a new built-in agent, this updates automatically — no need to hardcode a list. */
 object BuiltInAgents {
     fun all(): List<TerminalAgent> =
         TerminalAgent.getAllTerminalAgents()
             .filter { !it.agentKey.key.startsWith("custom.", ignoreCase = true) }
-}
-
-/** Agents additionally promoted by this plugin but not built into IDEA (must be written to customTools to appear in the dropdown).
- *  Unlike BuiltInAgents: these are convenience entries offered proactively by the plugin, not natively supported by IDEA,
- *  so they still need hardcoding — we cannot "dynamically" learn about agents IDEA does not publish. */
-object PromotedAgents {
-    data class Meta(val id: String, val displayName: String, val command: String)
-    val entries: List<Meta> = listOf(
-        Meta("cline",     "Cline",    "cline"),
-        Meta("codebuddy", "CodeBuddy", "codebuddy"),
-        Meta("continue",  "Continue", "cn"),
-        Meta("copilot",   "Copilot",  "copilot"),
-        Meta("cursor",    "Cursor",   "cursor-agent"),
-        Meta("gemini",    "Gemini",   "gemini"),
-        Meta("goose",     "Goose",    "goose"),
-        Meta("hermes",    "Hermes",   "hermes"),
-        Meta("kilo",      "Kilo Code","kilo"),
-        Meta("kimi",      "Kimi",     "kimi"),
-        Meta("openclaw",  "OpenClaw","openclaw"),
-        Meta("opencode",  "OpenCode", "opencode"),
-        Meta("pi",        "Pi",       "pi"),
-        Meta("qoder",     "Qoder",    "qoder"),
-        Meta("trae",      "TraeCode", "traecli"),
-        Meta("zcode",     "ZCode",    "zcode")
-    )
 }
 
 // Namespaced as "AgentExtenderSettingsExp" so this plugin (com.cnsharp.yolo.exp) can be installed
