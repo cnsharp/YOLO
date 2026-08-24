@@ -368,10 +368,9 @@ class AgentExtenderConfigurable : Configurable {
             modified = true
             reportDuplicates()
             // When the user adds/edits a row's ID or Command, if the tool is a known agent and its Skip flag column is
-            // still empty, prefill a default from DefaultSkipFlags — so a newly added agent gets its skip flag configured
+            // still empty, prefill a default from AgentRegistry — so a newly added agent gets its skip flag configured
             // without manual copying.
-            // Env-type agents (goose) do not go here; their bypass is injected as an env var by DefaultSkipEnvs inside
-            // TerminalSkipFlagCustomizer.
+            // Env-type agents (goose) do not go here; their bypass is injected as an env var by AgentRegistry.skipEnvFor.
             if (e.type == TableModelEvent.UPDATE && (e.column == COL_ID || e.column == COL_COMMAND)) {
                 autoFillSkipFlag(e.firstRow)
             }
@@ -379,7 +378,7 @@ class AgentExtenderConfigurable : Configurable {
     }
 
     /** When the user adds/edits a row's ID or Command, if the tool is a known agent and its Skip flag column is still
-     *  empty, prefill a default from DefaultSkipFlags (prefer by command binary name, fall back to ID).
+     *  empty, prefill a default from AgentRegistry (prefer by command binary name, fall back to ID).
      *  Only fills when the column is still empty; values the user manually cleared or changed are not overwritten. */
     private fun autoFillSkipFlag(row: Int) {
         if (row < 0 || row >= toolsModel.rowCount) return
@@ -518,7 +517,7 @@ class AgentExtenderConfigurable : Configurable {
             val state = AgentExtenderSettings.getInstance().state
             // Index existing permission rules by "command binary name" and write back to each row's Skip flag column
             val ruleByCmd = state.permissionRules.associateBy({ baseName(it.agentId).lowercase() }, { it.flag })
-            /** Prefer the user-saved rule; fall back to DefaultSkipFlags (by command name, then by id) if empty. */
+            /** Prefer the user-saved rule; fall back to AgentRegistry (by command name, then by id) if empty. */
             fun flagFor(cmd: String, id: String = ""): String {
                 val saved = ruleByCmd[baseName(cmd).lowercase()]
                 if (!saved.isNullOrBlank()) return@flagFor saved
@@ -527,7 +526,7 @@ class AgentExtenderConfigurable : Configurable {
                 }
             }
 
-            // ① Promoted by this plugin (e.g. claude/codex/codebuddy): in PromotedAgents.entries order (Claude Code, Codex pinned Top 2),
+            // ① Promoted by this plugin (e.g. claude/codex/codebuddy): in AgentRegistry.agents order (Claude Code, Codex pinned Top 2),
             //    read-only, not removable, icon fixed.
             promotedIds = AgentRegistry.agents.map { it.id.lowercase() }.toSet()
             for (def in AgentRegistry.agents) {
