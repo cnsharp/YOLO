@@ -127,14 +127,14 @@ class AgentExtenderSettings : PersistentStateComponent<AgentExtenderSettings.Sta
      *  Note: spawns processes, so the caller must ensure this runs on a background thread.
      */
     fun syncInstalledAgents() {
-        for ((id, displayName, command) in PromotedAgents.entries) {
-            if (!AgentDetector.canExecute(command)) continue
-            if (currentState.permissionRules.none { it.agentId == command }) {
-                currentState.permissionRules.add(PermissionRule(command, DefaultSkipFlags.forId(command)))
+        for (def in AgentRegistry.agents) {
+            if (!AgentDetector.canExecute(def.command)) continue
+            if (currentState.permissionRules.none { it.agentId == def.command }) {
+                currentState.permissionRules.add(PermissionRule(def.command, def.skipFlag))
             }
-            if (currentState.customTools.none { it.id == id }) {
+            if (currentState.customTools.none { it.id == def.id }) {
                 currentState.customTools.add(
-                    CustomTool(id = id, displayName = displayName, command = command)
+                    CustomTool(id = def.id, displayName = def.displayName, command = def.command)
                 )
             }
         }
