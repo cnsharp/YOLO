@@ -28,8 +28,8 @@ object AgentIcons {
 
 
     /** y icon for the Skip permissions checkbox (off/on). */
-    val SKIP_Y_OFF: Icon by lazy { loadBundled("/icons/agents/skipY.svg") }
-    val SKIP_Y_ON: Icon by lazy { loadBundled("/icons/agents/skipYOn.svg") }
+    val SKIP_Y_OFF: Icon by lazy { loadBundled("/icons/skipY.svg") }
+    val SKIP_Y_ON: Icon by lazy { loadBundled("/icons/skipYOn.svg") }
 
     /** Used by custom tools that have no dedicated icon. */
     val DEFAULT: Icon = AllIcons.Actions.Lightning
