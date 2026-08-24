@@ -152,33 +152,21 @@ class AgentExtenderSettingsExp : PersistentStateComponent<AgentExtenderSettingsE
      *  Note: spawns processes, so the caller must ensure this runs on a background thread.
      */
     fun syncInstalledAgents() {
-        // Cache the set of built-in agent identifiers (binary name + agent key) up front. Both the
-        // cleanup below and the terminal agent provider use it to suppress duplicate custom tools.
         val builtInIds = BuiltInAgents.all().flatMap { agent ->
             listOfNotNull(agent.binaryName, agent.agentKey.key).map { it.lowercase() }
         }.toSet()
         cachedBuiltInIds = builtInIds
-        for (agent in BuiltInAgents.all()) {
-            val id = agent.binaryName
-            if (!AgentDetector.canExecute(id)) continue
-            if (currentState.permissionRules.none { it.agentId == id }) {
-                currentState.permissionRules.add(PermissionRule(id, DefaultSkipFlags.forId(id)))
+        for (def in AgentRegistry.agents) {
+            if (!AgentDetector.canExecute(def.command)) continue
+            if (currentState.permissionRules.none { it.agentId == def.command }) {
+                currentState.permissionRules.add(PermissionRule(def.command, def.skipFlag))
             }
-        }
-        for ((id, displayName, command) in PromotedAgents.entries) {
-            if (!AgentDetector.canExecute(command)) continue
-            if (currentState.permissionRules.none { it.agentId == command }) {
-                currentState.permissionRules.add(PermissionRule(command, DefaultSkipFlags.forId(command)))
-            }
-            if (currentState.customTools.none { it.id == id }) {
+            if (currentState.customTools.none { it.id == def.id }) {
                 currentState.customTools.add(
-                    CustomTool(id = id, displayName = displayName, command = command)
+                    CustomTool(id = def.id, displayName = def.displayName, command = def.command)
                 )
             }
         }
-        // Drop any custom tool that now duplicates an IDEA built-in agent (e.g. legacy claude/codex
-        // entries persisted before IDEA shipped native Claude Code / Codex support). Without this, the
-        // terminal dropdown shows the agent twice — once from IDEA, once from this plugin.
         currentState.customTools.removeIf { tool ->
             tool.id.lowercase() in builtInIds || tool.command.lowercase() in builtInIds
         }
