@@ -1,5 +1,6 @@
 package com.cnsharp.yolo.terminal
 
+import com.cnsharp.yolo.settings.AgentRegistry
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.IconLoader
@@ -12,7 +13,7 @@ import javax.swing.Icon
  *
  * Three-level fallback; failure at any level will not make the dropdown entry disappear:
  *   1. Icon file specified by the user in Settings (iconPath, local absolute path)
- *   2. Official icon bundled with the plugin (matched to BUNDLED by agent id)
+ *   2. Official icon bundled with the plugin (looked up from AgentRegistry by agent id)
  *   3. Generic icon DEFAULT
  *
  * Bundled icon naming follows the terminal built-in convention: `<name>.svg` + `<name>_dark.svg`,
@@ -25,27 +26,6 @@ object AgentIcons {
     /** Standard edge length for dropdown icons, aligned with built-in claude-code.svg / codex.svg. */
     private const val SIZE = 16
 
-    /** Official icons bundled with the plugin: agent id -> classpath resource path. */
-    private val BUNDLED: Map<String, String> = mapOf(
-        "claude"    to "/icons/agents/claude.png",
-        "codex"     to "/icons/agents/codex.svg",
-        "codebuddy" to "/icons/agents/codebuddy.svg",
-        "gemini"    to "/icons/agents/gemini.png",
-        "copilot"   to "/icons/agents/copilot.svg",
-        "cursor"    to "/icons/agents/cursor.png",
-        "kimi"      to "/icons/agents/kimi.png",
-        "qoder"     to "/icons/agents/qoder.svg",
-        "hermes"    to "/icons/agents/hermes.png",
-        "opencode"  to "/icons/agents/opencode.png",
-        "continue"  to "/icons/agents/continue.png",
-        "cline"     to "/icons/agents/cline.png",
-        "kilo"      to "/icons/agents/kilo.svg",
-        "goose"     to "/icons/agents/goose.png",
-        "openclaw"  to "/icons/agents/openclaw.svg",
-        "pi"        to "/icons/agents/pi.svg",
-        "zcode"     to "/icons/agents/zcode.png",
-        "trae"      to "/icons/agents/trae.svg"
-    )
 
     /** y icon for the Skip permissions checkbox (off/on). */
     val SKIP_Y_OFF: Icon by lazy { loadBundled("/icons/agents/skipY.svg") }
@@ -69,7 +49,7 @@ object AgentIcons {
         cache[key]?.let { return it }
 
         val icon = loadUserIcon(iconPath)
-            ?: BUNDLED[agentId.lowercase()]?.let { loadBundled(it) }
+            ?: AgentRegistry.iconFor(agentId)?.let { loadBundled(it) }
             ?: DEFAULT
 
         cache[key] = icon
