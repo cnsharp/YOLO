@@ -49,7 +49,7 @@
         <!-- The standalone YOLO panel: a public tool window anchored on the right, using the plugin's y icon. -->
         <toolWindow id="YOLO"
                     anchor="right"
-                    icon="/icons/agents/skipY.svg"
+                    icon="/icons/skipY.svg"
                     doNotActivateOnStart="true"
                     factoryClass="com.cnsharp.yolo.panel.YoloToolWindowFactory"/>
     </extensions>
