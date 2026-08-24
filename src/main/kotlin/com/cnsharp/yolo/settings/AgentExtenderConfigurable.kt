@@ -361,8 +361,8 @@ class AgentExtenderConfigurable : Configurable {
         val command = (toolsModel.getValueAt(row, COL_COMMAND) as? String)?.trim() ?: ""
         val current = (toolsModel.getValueAt(row, COL_SKIP) as? String)?.trim() ?: ""
         if (current.isNotEmpty()) return
-        val byCmd = if (command.isNotBlank()) DefaultSkipFlags.forId(baseName(command)) else ""
-        val resolved = if (byCmd.isNotEmpty()) byCmd else DefaultSkipFlags.forId(id)
+        val byCmd = if (command.isNotBlank()) AgentRegistry.skipFlagFor(baseName(command)) else ""
+        val resolved = if (byCmd.isNotEmpty()) byCmd else AgentRegistry.skipFlagFor(id)
         if (resolved.isNotEmpty()) {
             autoFilling = true
             try {
@@ -494,12 +494,12 @@ class AgentExtenderConfigurable : Configurable {
             val state = AgentExtenderSettingsExp.getInstance().state
             // Index existing permission rules by "command binary name" and write back to each row's Skip flag column
             val ruleByCmd = state.permissionRules.associateBy({ baseName(it.agentId).lowercase() }, { it.flag })
-            /** Prefer the user-saved rule; fall back to DefaultSkipFlags (by command name, then by id) if empty. */
+            /** Prefer the user-saved rule; fall back to AgentRegistry (by command name, then by id) if empty. */
             fun flagFor(cmd: String, id: String = ""): String {
                 val saved = ruleByCmd[baseName(cmd).lowercase()]
-                if (!saved.isNullOrBlank()) return saved
-                return DefaultSkipFlags.forId(baseName(cmd)).ifBlank {
-                    DefaultSkipFlags.forId(id)
+                if (!saved.isNullOrBlank()) return@flagFor saved
+                return AgentRegistry.skipFlagFor(baseName(cmd)).ifBlank {
+                    AgentRegistry.skipFlagFor(id)
                 }
             }
 
@@ -508,11 +508,9 @@ class AgentExtenderConfigurable : Configurable {
             builtInIds = builtIns.map { it.agentKey.key.lowercase() }.toSet()
             builtInIconById = builtIns.associate { it.agentKey.key.lowercase() to it.icon }
             val builtInCmds = builtIns.map { it.binaryName.lowercase() }.toSet()
-            promotedIds = PromotedAgents.entries.map { it.id.lowercase() }.toSet()
             // IDEA built-in (dynamic): add row by row (keep IDEA's native order, highest priority)
             for (agent in builtIns) {
                 val id = agent.agentKey.key
-                // Built-in agents are not written to customTools, so their base args live in agentBaseArgs.
                 val baseArgs = state.agentBaseArgs[baseName(agent.binaryName).lowercase()] ?: ""
                 toolsModel.addRow(
                     arrayOf<Any>(
@@ -521,15 +519,14 @@ class AgentExtenderConfigurable : Configurable {
                     )
                 )
             }
-            // ② Promoted by this plugin (e.g. codebuddy): sorted by id first letter; priority below built-in, above user custom
-            for (meta in PromotedAgents.entries.sortedBy { it.id.lowercase() }) {
-                // Promoted agents *are* written to customTools (that is how they reach the dropdown), so read
-                // their base args back from there — otherwise the column would render empty and Apply would wipe it.
-                val baseArgs = state.customTools.firstOrNull { it.id.equals(meta.id, ignoreCase = true) }?.baseArgs ?: ""
+            // ② Promoted by this plugin (from AgentRegistry): in agents.json order, read-only, not removable
+            promotedIds = AgentRegistry.agents.map { it.id.lowercase() }.toSet()
+            for (def in AgentRegistry.agents) {
+                val baseArgs = state.agentBaseArgs[def.id.lowercase()] ?: ""
                 toolsModel.addRow(
                     arrayOf<Any>(
-                        "", meta.id, meta.displayName, meta.command,
-                        baseArgs, flagFor(meta.command, meta.id), ""
+                        "", def.id, def.displayName, def.command,
+                        baseArgs, flagFor(def.command, def.id), ""
                     )
                 )
             }
