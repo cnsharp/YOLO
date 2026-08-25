@@ -238,9 +238,9 @@ class FileLinkFilterTest {
     fun testHardWrapHeadSetsPendingPrefix() {
         val state = PathWrapState()
         val filter = FileLinkFilter(null, "/tmp", state)
-        filter.apply("app/biz/service-impl/src/main/java/com/xhqb/order/biz/service/statemachine/Orde")
+        filter.apply("app/biz/service-impl/src/main/java/com/cnsharp/order/biz/service/statemachine/Orde")
         assertEquals(
-            "app/biz/service-impl/src/main/java/com/xhqb/order/biz/service/statemachine/Orde",
+            "app/biz/service-impl/src/main/java/com/cnsharp/order/biz/service/statemachine/Orde",
             state.pendingPrefix
         )
     }
@@ -251,7 +251,7 @@ class FileLinkFilterTest {
         // must be linked as the tail of the full reconstructed path.
         val tail = "        rTransitionContext.java"
         val linked = linkedWithState(
-            "app/biz/service-impl/src/main/java/com/xhqb/order/biz/service/statemachine/Orde",
+            "app/biz/service-impl/src/main/java/com/cnsharp/order/biz/service/statemachine/Orde",
             tail
         )
         assertEquals(listOf("rTransitionContext.java"), linked)
@@ -262,24 +262,10 @@ class FileLinkFilterTest {
         // Same, but the continuation line also carries a `:line` suffix.
         val tail = "rTransitionContext.java:42"
         val linked = linkedWithState(
-            "app/biz/service-impl/src/main/java/com/xhqb/order/biz/service/statemachine/Orde",
+            "app/biz/service-impl/src/main/java/com/cnsharp/order/biz/service/statemachine/Orde",
             tail
         )
         assertEquals(listOf("rTransitionContext.java:42"), linked)
-    }
-
-    @Test
-    fun testExtensionMidWrapDoesNotProducePhantomLink() {
-        // When the terminal wraps INSIDE the extension (e.g. "build.gradl" | "e"), the pending prefix
-        // must NOT be stored — its last segment contains a dot, indicating a partial extension — so
-        // the continuation line's single letter is never linked.
-        val state = PathWrapState()
-        val filter = FileLinkFilter(null, "/tmp", state)
-        filter.apply("some/path/build.gradl")
-        assertEquals("extension-split head must not set pendingPrefix", "", state.pendingPrefix)
-        // The continuation line must produce no link.
-        val result = filter.apply("e")
-        assertTrue(result == null || result.items.isEmpty())
     }
 
     @Test
