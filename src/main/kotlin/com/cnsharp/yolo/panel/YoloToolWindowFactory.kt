@@ -2,6 +2,7 @@ package com.cnsharp.yolo.panel
 
 import com.cnsharp.yolo.YoloBundle.message
 import com.cnsharp.yolo.launcher.SkipPermissionsAction
+import com.cnsharp.yolo.launcher.ResumeAction
 import com.cnsharp.yolo.settings.AgentExtenderSettings
 import com.cnsharp.yolo.settings.AgentExtenderSettingsListener
 import com.cnsharp.yolo.settings.AgentRegistry
@@ -52,6 +53,7 @@ import java.awt.event.KeyEvent
 import java.beans.PropertyChangeListener
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
+import javax.swing.JButton
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
 import kotlin.math.max
@@ -118,6 +120,7 @@ private data class AgentRow(
     val command: String,
     val baseArgs: String,
     val skipFlag: String,
+    val resumeFlag: String,
     val iconPath: String
 )
 
@@ -237,19 +240,31 @@ private class YoloPanel(
 
         val group = DefaultActionGroup().apply {
             add(SkipPermissionsAction())
+            add(ResumeAction())
             add(OpenSettingsAction())
         }
         val toolbar = ActionManager.getInstance().createActionToolbar("YOLO.Toolbar", group, true)
         toolbar.targetComponent = this
 
+        // Launch starts the currently selected agent; the dropdown only selects (no auto-launch), so the
+        // Skip/Resume toggles are always applied on the next Launch and a mis-click on the dropdown never
+        // kills a running terminal.
+        val launchBtn = JButton(message("panel.launch")).apply {
+            addActionListener { launchSelected() }
+        }
+
         val header = JPanel(BorderLayout(JBUI.scale(6), 0)).apply {
-            add(agentCombo, BorderLayout.CENTER)
+            val selector = JPanel(BorderLayout(JBUI.scale(6), 0)).apply {
+                add(agentCombo, BorderLayout.CENTER)
+                add(launchBtn, BorderLayout.EAST)
+            }
+            add(selector, BorderLayout.CENTER)
             add(toolbar.component, BorderLayout.EAST)
         }
 
-        // Placeholder shown until the user picks an agent.
+        // Placeholder shown until the user picks an agent and clicks Launch.
         terminalHolder.add(
-            JBLabel("Select an agent above to start its terminal").apply {
+            JBLabel("Select an agent above, then click Launch to start its terminal").apply {
                 horizontalAlignment = javax.swing.SwingConstants.CENTER
             },
             BorderLayout.CENTER
@@ -257,9 +272,6 @@ private class YoloPanel(
 
         add(header, BorderLayout.NORTH)
         add(terminalHolder, BorderLayout.CENTER)
-
-        // Selecting an agent launches it immediately (no separate button).
-        agentCombo.addActionListener { onAgentSelected() }
 
         // Track OS display-scale changes so the embedded terminal can recompute (see scaleChangeListener).
         Toolkit.getDefaultToolkit().addPropertyChangeListener("awt.font.desktophints", scaleChangeListener)
@@ -294,7 +306,14 @@ private class YoloPanel(
         val visible = rows.filter { it.command.isBlank() || installed.contains(it.command.lowercase()) }
         agentCombo.removeAllItems()
         visible.forEach { agentCombo.addItem(it) }
-        if (agentCombo.itemCount > 0) agentCombo.selectedIndex = 0
+        selectDefaultAgent(visible)
+    }
+
+    /** Default the dropdown to the last launched agent (if still visible), otherwise to the "AI Agents" prompt. */
+    private fun selectDefaultAgent(visible: List<AgentRow>) {
+        val last = AgentExtenderSettings.getInstance().state.lastAgentId
+        val idx = if (last.isNotBlank()) visible.indexOfFirst { it.id == last } else -1
+        agentCombo.selectedIndex = if (idx in visible.indices) idx else 0
     }
 
     /** Re-scan installed agents on a background thread; update the cache and the dropdown only if it differs. */
@@ -310,11 +329,18 @@ private class YoloPanel(
     private fun buildRows(): List<AgentRow> {
         val settings = AgentExtenderSettings.getInstance().state
         val ruleByCmd = settings.permissionRules.associateBy({ baseName(it.agentId).lowercase() }, { it.flag })
+        val resumeRuleByCmd = settings.resumeRules.associateBy({ baseName(it.agentId).lowercase() }, { it.flag })
 
         fun flagFor(cmd: String, id: String): String {
             val saved = ruleByCmd[baseName(cmd).lowercase()]
             if (!saved.isNullOrBlank()) return saved
             return AgentRegistry.skipFlagFor(baseName(cmd)).ifBlank { AgentRegistry.skipFlagFor(id) }
+        }
+
+        fun resumeFor(cmd: String, id: String): String {
+            val saved = resumeRuleByCmd[baseName(cmd).lowercase()]
+            if (!saved.isNullOrBlank()) return saved
+            return AgentRegistry.resumeFlagFor(baseName(cmd)).ifBlank { AgentRegistry.resumeFlagFor(id) }
         }
 
         // Collect into a list, but skip any row whose (non-blank) command was already seen — promoted agents
@@ -329,10 +355,15 @@ private class YoloPanel(
         // The "AI Agents" prompt is the default selection (shown as the dropdown title). It is not a
         // real agent, so it launches nothing — this also prevents the first real agent from auto-launching
         // when the panel opens and selectedIndex is set programmatically.
-        addUnique(AgentRow("", message("panel.agentsPrompt"), "", "", "", ""))
+        addUnique(AgentRow("", message("panel.agentsPrompt"), "", "", "", "", ""))
         for (def in AgentRegistry.agents) {
             val baseArgs = settings.agentBaseArgs[def.id.lowercase()] ?: ""
-            addUnique(AgentRow(def.id, def.displayName, def.command, baseArgs, flagFor(def.command, def.id), ""))
+            addUnique(
+                AgentRow(
+                    def.id, def.displayName, def.command, baseArgs,
+                    flagFor(def.command, def.id), resumeFor(def.command, def.id), ""
+                )
+            )
         }
         for (tool in settings.customTools) {
             addUnique(
@@ -342,6 +373,7 @@ private class YoloPanel(
                     command = tool.command,
                     baseArgs = tool.baseArgs,
                     skipFlag = flagFor(tool.command, tool.id),
+                    resumeFlag = resumeFor(tool.command, tool.id),
                     iconPath = tool.iconPath
                 )
             )
@@ -349,10 +381,12 @@ private class YoloPanel(
         return rows
     }
 
-    private fun onAgentSelected() {
+    private fun launchSelected() {
         val row = agentCombo.selectedItem as? AgentRow ?: return
         // The default "AI Agents" prompt item has a blank command — never launch it.
         if (row.command.isBlank()) return
+        // Remember this agent so the panel re-selects it on next open.
+        AgentExtenderSettings.getInstance().state.lastAgentId = row.id
         launch(row)
     }
 
@@ -374,6 +408,13 @@ private class YoloPanel(
                 if (tokens.isNotEmpty() && tokens[0] !in cmd) cmd += tokens
             }
             envPair?.let { (name, value) -> env[name] = value }
+        }
+
+        // When "Resume session" is on, append the agent's resume flag (e.g. -r / --resume) so the agent
+        // continues a previous session. Agents with no resumeFlag are launched unchanged.
+        if (settings.resumeEnabled && row.resumeFlag.isNotBlank()) {
+            val tokens = row.resumeFlag.split(' ').filter { it.isNotBlank() }
+            if (tokens.isNotEmpty() && tokens[0] !in cmd) cmd += tokens
         }
 
         val shellCmd = cmd.joinToString(" ")
@@ -412,10 +453,13 @@ private class YoloPanel(
                 ApplicationManager.getApplication().invokeLater {
                     try {
                         val widget = YoloJediTermWidget(YoloTerminalSettings())
+                        // Hard-wrap state shared between the two path filters so they can reconstruct
+                        // paths that the terminal split across physical lines, and suppress duplicate links.
+                        val wrapState = PathWrapState()
                         // File references (path[:line[:col]], ranges, ~/, file://, quoted paths with spaces).
-                        widget.addHyperlinkFilter(FileLinkFilter(project, dir))
+                        widget.addHyperlinkFilter(FileLinkFilter(project, dir, wrapState))
                         // Stack-trace frames / tracebacks where only the file name is printed (Bar.java:123, File "x", line N).
-                        widget.addHyperlinkFilter(StackTraceLinkFilter(project, dir))
+                        widget.addHyperlinkFilter(StackTraceLinkFilter(project, dir, wrapState))
                         // Type references (qualified names and project simple names) → class declaration.
                         widget.addHyperlinkFilter(TypeLinkFilter(project))
                         // Class.member / Class#member → the specific method/field/inner class.

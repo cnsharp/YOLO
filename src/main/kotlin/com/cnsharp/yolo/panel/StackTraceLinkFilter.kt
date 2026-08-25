@@ -35,12 +35,14 @@ import java.util.regex.Pattern
  */
 class StackTraceLinkFilter(
     private val project: Project?,
-    private val baseDir: String
+    private val baseDir: String,
+    private val wrapState: PathWrapState? = null
 ) : HyperlinkFilter {
 
     override fun apply(text: String): LinkResult? {
         if (text.isBlank() || isDiffLine(text)) return null
         val items = mutableListOf<LinkResultItem>()
+        val continuationSpan = wrapState?.continuationSpan
         for (spec in SPECS) {
             val matcher = spec.pattern.matcher(text)
             var guard = 0
@@ -51,6 +53,11 @@ class StackTraceLinkFilter(
                 // not a real bare-file reference — don't link it. The agent only abbreviated the path; the
                 // fragment after the marker is not a file on its own.
                 if (isTruncatedPathHead(text, matcher.start(spec.fileGroup))) continue
+                // If FileLinkFilter already reconstructed the wrapped path and created a link covering
+                // this match's span, skip it to avoid a duplicate (and incorrect bare-name) link.
+                if (continuationSpan != null
+                    && matcher.start() < continuationSpan.last
+                    && matcher.end() > continuationSpan.first) continue
                 val line = if (spec.lineGroup >= 0) matcher.group(spec.lineGroup)?.toIntOrNull() else null
                 val column = if (spec.colGroup >= 0) matcher.group(spec.colGroup)?.toIntOrNull() else null
                 // Resolution (FilenameIndex / content roots) is deferred to click time so streaming output is

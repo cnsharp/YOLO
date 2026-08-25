@@ -98,4 +98,23 @@ class StackTraceLinkFilterTest {
             linked("see venus_unused_app_order-batch-timing_uat_20260820_144426.tsv now")
         )
     }
+
+    @Test
+    fun testWrapTailSuppressedWhenContinuationSpanSet() {
+        // When FileLinkFilter has already linked a continuation tail, StackTraceLinkFilter must not
+        // create a second (incorrect) bare-name link for the same span.
+        val state = PathWrapState()
+        state.continuationSpan = 8 until 30   // simulates FileLinkFilter linking "rTransitionContext.java"
+        val filter = StackTraceLinkFilter(null, "/tmp", state)
+        assertTrue(filter.apply("        rTransitionContext.java").let {
+            it == null || it.items.isEmpty()
+        })
+    }
+
+    @Test
+    fun testWrapTailLinkedNormallyWithoutState() {
+        // Without shared state (no wrapState), a fragment that happens to look like a bare file
+        // is still linked — we only suppress when FileLinkFilter explicitly set continuationSpan.
+        assertEquals(listOf("rTransitionContext.java"), linked("see rTransitionContext.java now"))
+    }
 }

@@ -33,12 +33,67 @@ import java.io.File
  */
 class FileLinkFilter(
     private val project: Project?,
-    private val baseDir: String
+    private val baseDir: String,
+    private val wrapState: PathWrapState? = null
 ) : HyperlinkFilter {
 
     override fun apply(text: String): LinkResult? {
-        if (text.isBlank() || isDiffLine(text)) return null
+        if (text.isBlank() || isDiffLine(text)) {
+            // A blank or diff line breaks any pending wrap sequence.
+            wrapState?.pendingPrefix = ""
+            wrapState?.continuationSpan = null
+            return null
+        }
         val items = mutableListOf<LinkResultItem>()
+
+        // --- Hard-wrap path reconstruction ---
+        // JediTerm calls apply() per physical line. When a long path wraps at terminal width, the
+        // head line ends with a path fragment (no extension, no :line) and we store it in
+        // wrapState.pendingPrefix. On the very next call (the continuation line) we prepend that
+        // prefix, re-match PATH_PATTERN on the joined text, and create a link for the tail portion
+        // inside the current line. The link resolves the FULL reconstructed path so navigation is
+        // correct even though only the tail is visible and clickable.
+        val prefix = wrapState?.pendingPrefix ?: ""
+        wrapState?.pendingPrefix = ""
+        wrapState?.continuationSpan = null
+
+        if (prefix.isNotEmpty()) {
+            val trimmed = text.trimStart()
+            val leading = text.length - trimmed.length
+            val combined = prefix + trimmed
+            val cm = PATH_PATTERN.matcher(combined)
+            while (cm.find()) {
+                val matchStart = cm.start(1)
+                val matchEnd = cm.end()
+                // Only care about matches that span the prefix/continuation boundary.
+                if (matchStart >= prefix.length || matchEnd <= prefix.length) continue
+                val rawC = cm.group(1)
+                val hasExtC = cm.group(2) != null
+                val hasLineC = cm.group(3) != null
+                if (!hasExtC && !hasLineC) {
+                    // Still no ext/line — path wraps again; store new prefix for next line.
+                    if (combined.substring(matchEnd).isBlank()) wrapState?.pendingPrefix = rawC
+                    continue
+                }
+                if (rawC.contains('…') || rawC.contains("...") || isTruncatedPath(combined, cm.end(1))) continue
+                val lineNum = cm.group(3)?.toIntOrNull()
+                val col = cm.group(5)?.toIntOrNull()
+                val fullPath = fileLinkTarget(rawC, cm.group(2))
+                val link = yoloHyperlink(project) {
+                    val file = resolve(fullPath) ?: return@yoloHyperlink
+                    val p = project ?: return@yoloHyperlink
+                    openFileAt(p, file, lineNum, col)
+                }
+                // Map the tail portion back to positions within `text`.
+                val tailStart = leading
+                val tailEnd = leading + (matchEnd - prefix.length)
+                if (tailEnd <= text.length) {
+                    items.add(LinkResultItem(tailStart, tailEnd, link))
+                    wrapState?.continuationSpan = tailStart until tailEnd
+                }
+            }
+        }
+        // --- End hard-wrap reconstruction ---
 
         // Quoted paths first (may contain spaces, e.g. `"/path with space/Bar.kt":5`). Their full spans are
         // recorded so the unquoted pass below can suppress a *sub-path* that falls inside the quotes — e.g.
@@ -82,7 +137,14 @@ class FileLinkFilter(
             // Skip bare extension-less, line-less paths: they are either directory references (not openable)
             // or — more importantly — fragments of a long path the terminal hard-wrapped across lines, which
             // would otherwise be painted as broken links (see PATH_PATTERN's completion requirement).
-            if (!hasExt && !hasLine) continue
+            if (!hasExt && !hasLine) {
+            // Hard-wrap head detection: if this no-ext/no-line path reaches the end of the line
+            // content, store it so the next physical line can attempt reconstruction.
+            if (wrapState != null && text.substring(m.end()).isBlank()) {
+                wrapState.pendingPrefix = raw
+            }
+            continue
+        }
             // A `…`/`...` truncation marker means the path is incomplete — skip it so we never link a broken
             // prefix (e.g. `/Users/me/Proj…name` or `/Users/me/Proj...name`). The ASCII-safe path class stops
             // at `…`, so the marker lands *just after* the captured path (m.end(1)); check both inside and

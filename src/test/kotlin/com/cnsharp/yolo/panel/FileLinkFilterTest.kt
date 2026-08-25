@@ -221,4 +221,66 @@ class FileLinkFilterTest {
         val ref = ".venus/venus_marked_delete_order_test1_20260819_155241.tsv"
         assertEquals(listOf(ref), linked("see $ref here"))
     }
+
+    // ---- Hard-wrap path reconstruction ----
+
+    private fun linkedWithState(line1: String, line2: String): List<String> {
+        val state = PathWrapState()
+        val filter = FileLinkFilter(null, "/tmp/agent-working-dir", state)
+        filter.apply(line1)       // processes head line, sets pendingPrefix
+        return filter.apply(line2)
+            ?.items
+            ?.map { line2.substring(it.startOffset, it.endOffset) }
+            .orEmpty()
+    }
+
+    @Test
+    fun testHardWrapHeadSetsPendingPrefix() {
+        val state = PathWrapState()
+        val filter = FileLinkFilter(null, "/tmp", state)
+        filter.apply("app/biz/service-impl/src/main/java/com/xhqb/order/biz/service/statemachine/Orde")
+        assertEquals(
+            "app/biz/service-impl/src/main/java/com/xhqb/order/biz/service/statemachine/Orde",
+            state.pendingPrefix
+        )
+    }
+
+    @Test
+    fun testHardWrapPathReconstructedOnContinuationLine() {
+        // The reported bug: `…/statemachine/Orde` wraps; the continuation `rTransitionContext.java`
+        // must be linked as the tail of the full reconstructed path.
+        val tail = "        rTransitionContext.java"
+        val linked = linkedWithState(
+            "app/biz/service-impl/src/main/java/com/xhqb/order/biz/service/statemachine/Orde",
+            tail
+        )
+        assertEquals(listOf("rTransitionContext.java"), linked)
+    }
+
+    @Test
+    fun testHardWrapPathWithLineReconstructed() {
+        // Same, but the continuation line also carries a `:line` suffix.
+        val tail = "rTransitionContext.java:42"
+        val linked = linkedWithState(
+            "app/biz/service-impl/src/main/java/com/xhqb/order/biz/service/statemachine/Orde",
+            tail
+        )
+        assertEquals(listOf("rTransitionContext.java:42"), linked)
+    }
+
+    @Test
+    fun testBlankLineBreaksWrapSequence() {
+        // An empty line between head and continuation clears the pending prefix.
+        val state = PathWrapState()
+        val filter = FileLinkFilter(null, "/tmp", state)
+        filter.apply("src/main/java/com/example/OrderTrans")
+        filter.apply("")            // blank line — must clear pendingPrefix
+        assertEquals("", state.pendingPrefix)
+        // Continuation line is now treated standalone, not as a reconstruction target.
+        val result = filter.apply("actionContext.java")
+        // Without a prefix the standalone "actionContext.java" has a directory component? No —
+        // StackTraceLinkFilter would link it, but FileLinkFilter (PATH_PATTERN) won't since it
+        // has no directory component. Verify FileLinkFilter produces nothing.
+        assertTrue(result == null || result.items.isEmpty())
+    }
 }

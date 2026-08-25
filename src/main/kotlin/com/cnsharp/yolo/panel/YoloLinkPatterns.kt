@@ -172,3 +172,4 @@ internal fun isTruncatedPathHead(text: String, fileStart: Int): Boolean {
     val c = text[fileStart - 1]
     return c == '…' || (c == '.' && text.startsWith("...", fileStart - 3))
 }
+
