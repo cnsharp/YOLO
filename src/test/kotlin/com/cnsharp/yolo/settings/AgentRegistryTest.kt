@@ -48,6 +48,16 @@ class AgentRegistryTest {
     }
 
     @Test
+    fun `resumeFlagFor prefers -r and resolves by command and by id`() {
+        assertEquals("-r", AgentRegistry.resumeFlagFor("claude"))
+        assertEquals("-r", AgentRegistry.resumeFlagFor("codebuddy"))
+        assertEquals("--resume", AgentRegistry.resumeFlagFor("cursor-agent"))
+        assertEquals("--taskId", AgentRegistry.resumeFlagFor("cline"))
+        assertEquals("", AgentRegistry.resumeFlagFor("kilo"))
+        assertEquals("", AgentRegistry.resumeFlagFor("cn"))
+    }
+
+    @Test
     fun `skipEnvFor returns null for non-env agents`() {
         assertNull(AgentRegistry.skipEnvFor("claude"))
     }

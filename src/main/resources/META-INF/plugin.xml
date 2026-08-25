@@ -62,6 +62,8 @@
              action.com.cnsharp.yolo.exp.SkipPermissionsAction.text/.description -->
         <action id="com.cnsharp.yolo.exp.SkipPermissionsAction"
                 class="com.cnsharp.yolo.launcher.SkipPermissionsAction"/>
+        <action id="com.cnsharp.yolo.exp.ResumeAction"
+                class="com.cnsharp.yolo.launcher.ResumeAction"/>
         <action id="com.cnsharp.yolo.exp.OpenSettingsAction"
                 class="com.cnsharp.yolo.settings.OpenSettingsAction"/>
     </actions>

@@ -54,7 +54,7 @@ class AgentExtenderConfigurable : Configurable {
         arrayOf(
             message("column.icon"), message("column.id"), message("column.displayName"),
             message("column.command"), message("column.baseArgs"),
-            message("column.skipFlag"), message("column.iconPath")
+            message("column.skipFlag"), message("column.resumeFlag"), message("column.iconPath")
         ),
         0
     )
@@ -86,6 +86,7 @@ class AgentExtenderConfigurable : Configurable {
         toolsTable.columnModel.getColumn(COL_ICON).cellRenderer = IconRenderer()
         toolsTable.columnModel.getColumn(COL_ICON).preferredWidth = 48
         toolsTable.columnModel.getColumn(COL_SKIP).preferredWidth = 200
+        toolsTable.columnModel.getColumn(COL_RESUME).preferredWidth = 200
         // The icon path/URL is edited exclusively via the icon-setting row below the table, so hide this
         // grid column from the view. The underlying model column is kept — the icon button writes to it and
         // apply()/reset() still read it for persistence.
@@ -132,7 +133,7 @@ class AgentExtenderConfigurable : Configurable {
         val button = JButton(message("button.add"))
         button.toolTipText = message("button.add.tooltip")
         button.addActionListener {
-            toolsModel.addRow(arrayOf<Any>("", "", "", "", "", "", ""))
+            toolsModel.addRow(arrayOf<Any>("", "", "", "", "", "", "", ""))
             val last = toolsModel.rowCount - 1
             toolsTable.selectionModel.setSelectionInterval(last, last)
             toolsTable.scrollRectToVisible(toolsTable.getCellRect(last, COL_ID, true))
@@ -347,6 +348,7 @@ class AgentExtenderConfigurable : Configurable {
             // Env-type agents (goose) do not go here; their bypass is injected as an env var by AgentRegistry.skipEnvFor.
             if (e.type == TableModelEvent.UPDATE && (e.column == COL_ID || e.column == COL_COMMAND)) {
                 autoFillSkipFlag(e.firstRow)
+                autoFillResumeFlag(e.firstRow)
             }
         }
     }
@@ -366,6 +368,27 @@ class AgentExtenderConfigurable : Configurable {
             autoFilling = true
             try {
                 toolsModel.setValueAt(resolved, row, COL_SKIP)
+            } finally {
+                autoFilling = false
+            }
+        }
+    }
+
+    /** Same auto-prefill behavior as [autoFillSkipFlag], but for the Resume flag column (COL_RESUME), reading
+     *  AgentRegistry.resumeFlagFor. Custom tools have no agents.json entry, so for them this column stays empty
+     *  until the user fills it in. */
+    private fun autoFillResumeFlag(row: Int) {
+        if (row < 0 || row >= toolsModel.rowCount) return
+        val id = (toolsModel.getValueAt(row, COL_ID) as? String)?.trim() ?: ""
+        val command = (toolsModel.getValueAt(row, COL_COMMAND) as? String)?.trim() ?: ""
+        val current = (toolsModel.getValueAt(row, COL_RESUME) as? String)?.trim() ?: ""
+        if (current.isNotEmpty()) return
+        val byCmd = if (command.isNotBlank()) AgentRegistry.resumeFlagFor(baseName(command)) else ""
+        val resolved = if (byCmd.isNotEmpty()) byCmd else AgentRegistry.resumeFlagFor(id)
+        if (resolved.isNotEmpty()) {
+            autoFilling = true
+            try {
+                toolsModel.setValueAt(resolved, row, COL_RESUME)
             } finally {
                 autoFilling = false
             }
@@ -418,6 +441,17 @@ class AgentExtenderConfigurable : Configurable {
             }
         }
         settings.state.permissionRules = newRules
+
+        // ①b Resume rules: from each row's Resume flag (same matching by command binary name; empty column falls back to agents.json).
+        val newResumeRules = mutableListOf<ResumeRule>()
+        for (r in 0 until toolsModel.rowCount) {
+            val command = (toolsModel.getValueAt(r, COL_COMMAND) as? String)?.trim() ?: ""
+            val flag = (toolsModel.getValueAt(r, COL_RESUME) as? String)?.trim() ?: ""
+            if (command.isNotBlank() && flag.isNotBlank()) {
+                newResumeRules.add(ResumeRule(agentId = baseName(command), flag = flag))
+            }
+        }
+        settings.state.resumeRules = newResumeRules
 
         // ② Custom tools: skip built-in/promoted (they are not written to customTools); only save user custom tools
         val builtInCmds = BuiltInAgents.all().map { it.binaryName.lowercase() }.toSet()
@@ -502,6 +536,17 @@ class AgentExtenderConfigurable : Configurable {
                 }
             }
 
+            // Index existing resume rules by "command binary name" and write back to each row's Resume flag column.
+            val resumeRuleByCmd = state.resumeRules.associateBy({ baseName(it.agentId).lowercase() }, { it.flag })
+            /** Prefer the user-saved rule; fall back to AgentRegistry (by command name, then by id) if empty. */
+            fun resumeFor(cmd: String, id: String = ""): String {
+                val saved = resumeRuleByCmd[baseName(cmd).lowercase()]
+                if (!saved.isNullOrBlank()) return@resumeFor saved
+                return AgentRegistry.resumeFlagFor(baseName(cmd)).ifBlank {
+                    AgentRegistry.resumeFlagFor(id)
+                }
+            }
+
             // ① IDEA built-in (dynamic)
             val builtIns: List<TerminalAgent> = BuiltInAgents.all()
             builtInIds = builtIns.map { it.agentKey.key.lowercase() }.toSet()
@@ -513,7 +558,7 @@ class AgentExtenderConfigurable : Configurable {
                 toolsModel.addRow(
                     arrayOf<Any>(
                         "", id, agent.displayName, agent.binaryName,
-                        baseArgs, flagFor(agent.binaryName, id), ""
+                        baseArgs, flagFor(agent.binaryName, id), resumeFor(agent.binaryName, id), ""
                     )
                 )
             }
@@ -524,7 +569,7 @@ class AgentExtenderConfigurable : Configurable {
                 toolsModel.addRow(
                     arrayOf<Any>(
                         "", def.id, def.displayName, def.command,
-                        baseArgs, flagFor(def.command, def.id), ""
+                        baseArgs, flagFor(def.command, def.id), resumeFor(def.command, def.id), ""
                     )
                 )
             }
@@ -539,7 +584,7 @@ class AgentExtenderConfigurable : Configurable {
                 toolsModel.addRow(
                     arrayOf<Any>(
                         "", tool.id, tool.displayName, tool.command,
-                        tool.baseArgs, flagFor(tool.command), tool.iconPath
+                        tool.baseArgs, flagFor(tool.command), resumeFor(tool.command, tool.id), tool.iconPath
                     )
                 )
             }
@@ -636,7 +681,8 @@ class AgentExtenderConfigurable : Configurable {
         private const val COL_COMMAND = 3
         private const val COL_BASE_ARGS = 4
         private const val COL_SKIP = 5
-        private const val COL_ICON_PATH = 6
+        private const val COL_RESUME = 6
+        private const val COL_ICON_PATH = 7
 
         private val NOTIFY: com.intellij.notification.NotificationGroup by lazy {
             NotificationGroupManager.getInstance().getNotificationGroup("com.cnsharp.yolo.exp.notifications")
