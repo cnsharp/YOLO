@@ -269,6 +269,20 @@ class FileLinkFilterTest {
     }
 
     @Test
+    fun testExtensionMidWrapDoesNotProducePhantomLink() {
+        // When the terminal wraps INSIDE the extension (e.g. "build.gradl" | "e"), the pending prefix
+        // must NOT be stored — its last segment contains a dot, indicating a partial extension — so
+        // the continuation line's single letter is never linked.
+        val state = PathWrapState()
+        val filter = FileLinkFilter(null, "/tmp", state)
+        filter.apply("some/path/build.gradl")
+        assertEquals("extension-split head must not set pendingPrefix", "", state.pendingPrefix)
+        // The continuation line must produce no link.
+        val result = filter.apply("e")
+        assertTrue(result == null || result.items.isEmpty())
+    }
+
+    @Test
     fun testBlankLineBreaksWrapSequence() {
         // An empty line between head and continuation clears the pending prefix.
         val state = PathWrapState()

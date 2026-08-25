@@ -138,10 +138,17 @@ class FileLinkFilter(
             // or — more importantly — fragments of a long path the terminal hard-wrapped across lines, which
             // would otherwise be painted as broken links (see PATH_PATTERN's completion requirement).
             if (!hasExt && !hasLine) {
-            // Hard-wrap head detection: if this no-ext/no-line path reaches the end of the line
-            // content, store it so the next physical line can attempt reconstruction.
+            // Hard-wrap head detection: if this path fragment reaches the end of the line content,
+            // store it so the next physical line can attempt reconstruction.
+            // Guard: only store when the last path segment has NO dot. A dot in the last segment
+            // means the wrap split inside the extension (e.g. "build.gradl" for ".gradle") and the
+            // continuation line would carry only the remaining extension chars — creating a 1–2
+            // character phantom link (e.g. just "e"). Without a dot the fragment ends mid-name
+            // (e.g. "OrderTransitionContext" before ".java"), which is the correct wrap case.
             if (wrapState != null && text.substring(m.end()).isBlank()) {
-                wrapState.pendingPrefix = raw
+                val lastSep = raw.lastIndexOfAny(charArrayOf('/', '\\'))
+                val lastSegment = if (lastSep >= 0) raw.substring(lastSep + 1) else raw
+                if (!lastSegment.contains('.')) wrapState.pendingPrefix = raw
             }
             continue
         }
