@@ -33,6 +33,10 @@ object AgentIcons {
     val SKIP_Y_OFF: Icon by lazy { loadBundled("/icons/skipY.svg") }
     val SKIP_Y_ON: Icon by lazy { loadBundled("/icons/skipYOn.svg") }
 
+    /** Replay icon for the Resume-session checkbox (off/on). */
+    val RESUME_OFF: Icon by lazy { loadBundled("/icons/resume.svg") }
+    val RESUME_ON: Icon by lazy { loadBundled("/icons/resumeOn.svg") }
+
     /** Used by custom tools that have no dedicated icon. */
     val DEFAULT: Icon = AllIcons.Actions.Lightning
 
@@ -91,7 +95,9 @@ object AgentIcons {
 
     private fun loadBundled(path: String): Icon =
         try {
-            IconLoader.getIcon(path, AgentIcons::class.java.classLoader)
+            val raw = IconLoader.getIcon(path, AgentIcons::class.java.classLoader)
+            if (raw.iconWidth == SIZE && raw.iconHeight == SIZE) raw
+            else IconUtil.resizeSquared(raw, SIZE)
         } catch (e: Exception) {
             LOG.warn("AI Agents Extender: bundled icon load failed: $path", e)
             DEFAULT
