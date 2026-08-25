@@ -16,13 +16,12 @@ This plugin addresses both.
 ![yolo-more-agents.png](screenshots/yolo-more-agents.png)
 
 
-Add any AI CLI — Gemini, Copilot, Cursor, Cline, OpenCode, or something you wrote yourself — to the
-Terminal's AI Agents menu, with its own display name and icon. IDEA's built-in agents are never
-replaced or reordered; your tools are appended.
-
-An agent only appears in the dropdown if its command resolves on `PATH`. That's the terminal's own
-rule, not the plugin's — the Settings table greys out the icon of anything it can't find, so you can
-see at a glance what's actually installed.
+- Lists your **installed** agents — promoted agents (Claude Code, Codex, CodeBuddy, ZCode, …) plus your own custom tools.
+  Agents that aren't detected on `PATH` simply aren't shown, so the list stays relevant to this machine.
+- Each row shows the agent's icon, name, and its configured skip and resume flags.
+- The dropdown loads **instantly from a cached install scan** — the detection done on a previous run is reused, and a
+  background re-scan refreshes the list only when the set of installed agents actually changes.
+- The panel header holds two toggles — **YOLO (Skip Permissions)** and **Resume Session** — plus the settings gear, and a **Launch** button.
 
 ### YOLO mode
 
@@ -39,7 +38,62 @@ env var has to be set before the process starts rather than appended to the comm
 
 **The toggle is off by default and never turns itself on.**
 
-A gear button on the right of the dropdown opens the plugin's settings directly.
+### Resume session
+
+A **Resume Session** toggle in the panel header. Turn it on and the next launch starts the agent with its
+resume flag appended — `-r` for Claude Code / CodeBuddy / Copilot / Goose / Hermes / Kimi / Pi, `--resume` for
+Codex / Cursor / TraeCode, `--taskId` for Cline — so the agent continues a previous session instead of starting fresh.
+
+The flag is **per agent** and fully configurable (see [Configuration](#configuration)). The plugin knows the correct
+resume flag for the common agents and pre-fills it, and custom tools set their own in the **Resume flag** column — a
+custom tool has no bundled `agents.json` entry, so that column is the only way to give it a resume flag. Agents without a
+CLI resume capability (e.g. Gemini / OpenCode / ZCode use a TUI `/resume` instead of a flag) launch unchanged when the
+toggle is on.
+
+**The toggle is off by default and never turns itself on.**
+
+### Runs inside the panel (real terminal)
+
+**Select an agent, then click Launch** — the dropdown only selects; the agent opens in a
+**real, interactive terminal embedded directly inside the YOLO panel** when you press **Launch**: a genuine PTY (via JediTerm + PTY4J, the same
+terminal emulator the IDE itself bundles) that renders the agent's TUI in place. Prompts, editors, and your rc-defined
+`PATH` (nvm / fnm / npm global bin, …) all work because the agent runs through an interactive login shell.
+
+Because selection and execution are separate, the **Skip Permissions** / **Resume Session** toggles always apply to the next
+launch, and changing the dropdown never kills a running terminal. The last agent you launched is remembered and re-selected
+the next time you open the panel.
+
+- **The caret lands in the terminal automatically** when an agent launches, so you can type right away.
+- **Ctrl+C is no longer hijacked by IDEA's Copy shortcut.** With the terminal focused, Ctrl+C passes through to the
+  embedded terminal instead of popping IDEA's "Shortcuts conflicts" dialog. Whether it interrupts the running agent
+  depends on the agent's own TUI.
+
+> This is built entirely on **public APIs**: JediTerm and PTY4J are third-party libraries shipped with the IntelliJ
+> Platform (not `@ApiStatus.Internal` / `@Experimental` Terminal APIs), so the plugin stays publishable on the
+> JetBrains Marketplace. The IDE's own `ConsoleView` is output-only (no interactive input), so a real agent can only
+> live in the panel by embedding a true terminal — which is exactly what this does.
+
+### Clickable terminal output
+
+While the agent runs, its output is scanned for references and turned into hyperlinks. Clicking a link jumps you to the
+right place and **auto-hides the YOLO panel** so it no longer covers the editor.
+
+| You print… | Becomes a link to… |
+|---|---|
+| `src/foo/Bar.kt:42`, `/abs/Bar.kt:42:13`, `C:\foo\Bar.kt:7` | the file at that line / column |
+| `./Makefile:10`, `~/x/y.kt:3`, `file:///abs/x.kt` | the file (home-relative and `file://` URIs supported) |
+| `path:12-18` | the file at the start of the line range |
+| `"/path with space/Bar.kt":5` | a quoted path containing spaces |
+| `Bar.java:123`, `Bar.kt:12` | a bare stack-trace frame |
+| `File "app/main.py", line 42` | a Python / JS traceback frame |
+| `plugin.xml`, `build.gradle.kts`, `README.md` | a bare file name anywhere in the project |
+| `com.foo.Bar` / `Bar` | the class declaration (qualified or project-local simple name) |
+| `Bar.method` / `Bar#method` | the specific method / field / inner class |
+| `https://example.com` | the URL, opened in your system browser (panel is **not** hidden) |
+
+- **Line/column navigation** works for paths, stack frames, and member references.
+- **No-extension files** (`Makefile`, `Dockerfile`) and **Windows paths** are handled.
+- URLs are the exception: clicking one opens your browser but keeps the panel open.
 
 > ### Warning — about YOLO mode
 >
@@ -113,7 +167,7 @@ Everything lives in one table. Each row is an agent, and each row carries its ow
 | Command | Executable name — must resolve on `PATH` |
 | Base args | Arguments always passed, space separated |
 | Skip flag | The permission-bypass argument, appended when the YOLO toggle is on |
-| Icon file / URL | A local image or `http(s)` URL — custom tools only |
+| Resume flag | The resume argument, appended when the Resume Session toggle is on (e.g. `-r`, `--resume`) |
 
 Rows come in three kinds, listed in descending priority:
 
@@ -121,13 +175,12 @@ Rows come in three kinds, listed in descending priority:
 2. **Agents this plugin knows about** (Gemini, Cline, CodeBuddy, …) — read-only, sorted by ID
 3. **Your own custom tools** — fully editable, in the order you created them
 
-Only the Skip flag is editable on the first two kinds. That's deliberate: the plugin should extend
-the dropdown, not take it over.
+Only the Skip flag and Resume flag are editable on promoted agents. That's deliberate: the plugin should extend the panel, not take it over.
 
 ### Conveniences
 
-- **Skip flags pre-fill themselves.** Open the settings and known agents already have the right
-  flag. Type a known ID or command into a new row and it fills in as you go. Values you set by hand
+- **Skip and resume flags pre-fill themselves.** Open the settings and known agents already have the right
+  flags. Type a known ID or command into a new row and they fill in as you go. Values you set by hand
   are never overwritten.
 - **Duplicates are caught while you type.** A repeated ID or command turns the status line red
   immediately, and Apply refuses to save. Commands are compared by executable name, so
@@ -140,25 +193,26 @@ the dropdown, not take it over.
 Flags below are pre-filled. All of them are editable, and this list is a convenience — not the
 source of truth. What runs is whatever the settings say.
 
-| Agent | Command | Skip flag |
-|---|---|---|
-| Junie | `junie` | `--dangerously-skip-permissions` |
-| Claude Code | `claude` | `--dangerously-skip-permissions` |
-| Codex | `codex` | `--yolo` |
-| CodeBuddy | `codebuddy` | `-y` |
-| Gemini | `gemini` | `--yolo` |
-| Copilot | `copilot` | `--allow-all` |
-| Cursor | `cursor-agent` | `--force` |
-| Kimi | `kimi` | `--yolo` |
-| Qoder | `qoder` | `--dangerously-skip-permissions` |
-| Hermes | `hermes` | `--yolo` |
-| OpenCode | `opencode` | `--auto` |
-| Continue | `cn` | `--auto` |
-| Cline | `cline` | `--auto-approve true` |
-| Goose | `goose` | env `GOOSE_MODE=auto` — not a flag |
-| Kilo Code | `kilo` | none — only `kilo run` accepts one |
-| OpenClaw | `openclaw` | none — persistent config only |
-| Pi | `pi` | `--approve` |
+| Agent | Command | Skip flag | Resume flag |
+|---|---|---|---|
+| Claude Code | `claude` | `--dangerously-skip-permissions` | `-r` |
+| Codex | `codex` | `--yolo` | `--resume` |
+| CodeBuddy | `codebuddy` | `-y` | `-r` |
+| Gemini | `gemini` | `--yolo` | none — TUI `/resume` only |
+| Copilot | `copilot` | `--allow-all` | `-r` |
+| Cursor | `cursor-agent` | `--force` | `--resume` |
+| Kimi | `kimi` | `--yolo` | `-r` |
+| Qoder | `qoder` | `--dangerously-skip-permissions` | none — not implemented |
+| Hermes | `hermes` | `--yolo` | `-r` |
+| OpenCode | `opencode` | `--auto` | none — TUI `/resume` only |
+| Continue | `cn` | `--auto` | none |
+| Cline | `cline` | `--auto-approve true` | `--taskId` |
+| Goose | `goose` | env `GOOSE_MODE=auto` — not a flag | `-r` |
+| Kilo Code | `kilo` | none — only `kilo run` accepts one | none |
+| OpenClaw | `openclaw` | none — persistent config only | none — `openclaw resume` subcommand |
+| Pi | `pi` | `--approve` | `-r` |
+| TraeCode | `traecli` | none | `--resume` |
+| ZCode | `zcode` | none — no launch-time bypass flag | none — TUI `/resume` only |
 
 Anything not listed here works fine as a custom tool; just fill in its flag yourself.
 
@@ -184,8 +238,9 @@ grep "AI Agents Extender" "$env:LOCALAPPDATA\JetBrains\IntelliJIdea<version>\log
 table — a greyed-out icon means not found. Note that the IDE inherits the `PATH` of whatever
 launched it, which may differ from your shell's.
 
-**The flag isn't being applied.** Confirm the YOLO toggle is on and the row has a Skip flag. The log
-line for each launch shows the final command, including whether anything was injected.
+**The flag isn't being applied.** Confirm the relevant toggle is on (YOLO for the skip flag, Resume Session for the
+resume flag) and the row has a value in that column. The log line for each launch shows the final command, including
+whether anything was injected.
 
 **Settings changes don't take effect.** The plugin registers a `Configurable`, which IDEA cannot
 load dynamically. Restart the IDE after installing or updating.
