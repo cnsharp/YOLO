@@ -15,6 +15,14 @@ data class PermissionRule(
     var flag: String = "--dangerously-skip-permissions"
 )
 
+/** "Resume session" rule for a single tool: stores the agent's resume flag value;
+ *  whether it is actually injected is decided by the toolbar's global "Resume session" checkbox (resumeEnabled).
+ *  Custom tools have no agents.json entry, so this is the only way to give them a resume flag. */
+data class ResumeRule(
+    var agentId: String = "",
+    var flag: String = ""
+)
+
 /** A custom tool that appears in the terminal "AI Agents" dropdown (user-added, distinct from IDEA's built-in agents). */
 data class CustomTool(
     var id: String = "",
@@ -84,8 +92,15 @@ class AgentExtenderSettings : PersistentStateComponent<AgentExtenderSettings.Sta
     class State {
         // Toolbar global "Skip permissions" checkbox state; off by default, only injected when the user explicitly checks it.
         var skipEnabled: Boolean = false
+        // Toolbar global "Resume session" checkbox state; off by default, only injects the agent's resumeFlag when checked.
+        var resumeEnabled: Boolean = false
+        // Last agent launched in the YOLO panel (by agent id); restored as the dropdown's default selection on next open.
+        var lastAgentId: String = ""
         // Each agent's skip flag value (from Settings); whether it is injected is controlled by skipEnabled.
         var permissionRules: MutableList<PermissionRule> = mutableListOf()
+        // Each agent's resume flag value (from Settings); whether it is injected is controlled by resumeEnabled.
+        // Falls back to AgentRegistry's agents.json value when empty. Custom tools have no agents.json entry, so they rely on this.
+        var resumeRules: MutableList<ResumeRule> = mutableListOf()
         var customTools: MutableList<CustomTool> = mutableListOf()
         /**
          * Per-agent extra launch arguments (base args) keyed by lower-cased agent id. Only needed for

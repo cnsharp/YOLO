@@ -9,6 +9,7 @@ data class AgentDef(
     val displayName: String,
     val command: String,
     val skipFlag: String = "",
+    val resumeFlag: String = "",
     val skipEnv: Pair<String, String>? = null,
     val icon: String = ""
 )
@@ -33,6 +34,8 @@ object AgentRegistry {
 
     /** Lookup by command first, then by id — mirrors how DefaultSkipFlags.forId was called. */
     fun skipFlagFor(key: String): String = lookupByKey(key)?.skipFlag ?: ""
+
+    fun resumeFlagFor(key: String): String = lookupByKey(key)?.resumeFlag ?: ""
 
     fun skipEnvFor(key: String): Pair<String, String>? = lookupByKey(key)?.skipEnv
 
@@ -64,6 +67,7 @@ object AgentRegistry {
         val displayName: String = "",
         val command: String = "",
         val skipFlag: String = "",
+        val resumeFlag: String = "",
         val skipEnv: SkipEnvJson? = null,
         val icon: String = ""
     ) {
@@ -72,6 +76,7 @@ object AgentRegistry {
             displayName = displayName,
             command = command,
             skipFlag = skipFlag,
+            resumeFlag = resumeFlag,
             skipEnv = skipEnv?.let { it.name to it.value },
             icon = icon
         )

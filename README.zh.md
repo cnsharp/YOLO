@@ -20,10 +20,10 @@
 
 - 列出你**已安装**的智能体 —— 包括官方推荐的智能体(Claude Code、Codex、CodeBuddy、ZCode……)以及你自己的自定义工具。
   在 `PATH` 上检测不到的智能体不会显示,因此列表始终与当前机器相关。
-- 每一行显示智能体的图标、名称以及其配置的跳过(skip)标志。
+- 每一行显示智能体的图标、名称以及其配置的跳过(skip)与恢复(resume)标志。
 - 下拉列表从**已缓存的安装扫描结果**瞬间加载 —— 复用上一次运行所做的检测,只有当已安装智能体的集合真正发生变化时,
   才在后台重新扫描刷新。
-- 面板标题栏、设置齿轮左侧,有一个 **YOLO(跳过权限)** 开关。
+- 面板标题栏中有两个开关 —— **YOLO(跳过权限)** 和 **Resume Session** —— 以及设置齿轮和一个 **Launch(启动)** 按钮。
 
 ### YOLO 模式
 
@@ -37,12 +37,28 @@ Claude Code 是 `--dangerously-skip-permissions`,Codex 是 `--yolo`,CodeBuddy �
 
 **该开关默认关闭,且永远不会自行打开。**
 
+### 恢复会话
+
+面板标题栏里的 **Resume Session** 开关。打开它,下一次启动智能体时就会在命令后追加其恢复标志 ——
+Claude Code / CodeBuddy / Copilot / Goose / Hermes / Kimi / Pi 为 `-r`,Codex / Cursor / TraeCode 为 `--resume`,
+Cline 为 `--taskId` —— 于是智能体会继续上一次的会话,而不是从头开始。
+
+该标志是**每个智能体独立配置**的,且完全可定制(见[配置](#配置))。插件已为常见智能体预填好正确的恢复标志;
+自定义工具则在 **恢复会话参数(Resume flag)** 列中自行填写 —— 自定义工具没有内置的 `agents.json` 条目,
+那一列正是你为它设置恢复参数的唯一途径。没有命令行恢复能力的智能体(例如 Gemini / OpenCode / ZCode 用的是 TUI 的 `/resume`)
+在开关打开时仍照常启动、不会注入任何标志。
+
+**该开关默认关闭,且永远不会自行打开。**
+
 ### 运行在面板内(真实终端)
 
-**在下拉列表中选择一个智能体即可立即启动** —— 没有单独的按钮。智能体在一个**直接嵌入 YOLO 面板的、
-真实的、可交互的终端**中打开:一个真正的 PTY(通过 JediTerm + PTY4J,即 IDE 自带的那套终端模拟器),
+**先在下拉列表中选择一个智能体,然后点击 Launch(启动)** —— 下拉只做选择;当你按下 **Launch** 时,智能体在一个
+**直接嵌入 YOLO 面板的、真实的、可交互的终端**中打开:一个真正的 PTY(通过 JediTerm + PTY4J,即 IDE 自带的那套终端模拟器),
 原地渲染智能体的 TUI。提示符、编辑器以及你在 rc 中定义的 `PATH`(nvm / fnm / npm 全局 bin……)都能正常工作,
 因为智能体运行在一个交互式登录 shell 中。
+
+由于"选择"与"执行"分离,**跳过权限** / **Resume Session** 开关总是作用于下一次启动,且改动下拉列表绝不会杀掉正在运行的终端。
+你上次启动过的智能体会被记住,并在下次打开面板时自动重新选中。
 
 - 智能体启动时,**光标自动落到终端里**,你可以立刻开始输入。
 - **Ctrl+C 不再被 IDEA 的复制快捷键劫持。** 终端获得焦点时,Ctrl+C 会直接穿透到嵌入式终端,
@@ -175,17 +191,18 @@ localIdeaPath=/Applications/IntelliJ IDEA.app
 | 命令 | 可执行文件名 —— 必须在 `PATH` 上可解析 |
 | 基础参数 | 始终传入的参数,以空格分隔 |
 | 跳过标志 | 权限绕过参数,在 YOLO 开关打开时追加 |
+| 恢复会话参数 | 恢复参数,在 Resume Session 开关打开时追加(如 `-r`、`--resume`) |
 
 行分两种,按优先级从高到低排列:
 
 1. **推荐智能体**(Claude Code、Codex、CodeBuddy、ZCode……)—— 只读,且 **Claude Code** 和 **Codex** 固定在最上方,不可删除。
 2. **你自己的自定义工具** —— 完全可编辑,按你创建的顺序排列。
 
-推荐智能体上只有跳过标志可编辑。这是有意为之:插件应当扩展面板,而不是接管它。
+推荐智能体上只有跳过标志与恢复会话参数可编辑。这是有意为之:插件应当扩展面板,而不是接管它。
 
 ### 便捷功能
 
-- **跳过标志自动预填。** 打开设置,已知智能体已经带上了正确的标志。在新建行中键入已知 ID 或命令时,它会随输入自动补全。你手动设置的值永远不会被覆盖。
+- **跳过标志与恢复参数自动预填。** 打开设置,已知智能体已经带上了正确的标志。在新建行中键入已知 ID 或命令时,它们会随输入自动补全。你手动设置的值永远不会被覆盖。
 - **重复项在你输入时即被捕获。** 重复的 ID 或命令会立刻把状态行变红,且应用(Apply)会拒绝保存。命令按可执行文件名比较,因此 `/usr/bin/claude` 和 `claude.cmd` 算作同一个工具。
 - **每次启动时检测已安装的智能体。** 插件在后台检查每个已知智能体的命令 —— 先查 `PATH`,再实际运行一次(`--version`) —— 然后把检测到的推荐智能体加入列表。这发生在**每次启动**,而不只是第一次,因此你之后安装的某个工具(例如通过 npm 安装的 Gemini)会自动出现。它**不会**自动发现你自己写的任意工具 —— 那些请作为自定义工具添加。结果会被缓存,因此面板之后能立即打开。
 - **校验(Validate)** 以相同方式(先查 PATH,再运行一次)检查某行的命令,并在有图标 URL 时下载该图标。
@@ -194,25 +211,26 @@ localIdeaPath=/Applications/IntelliJ IDEA.app
 
 下表中的标志已预填。它们全部可编辑,且此列表只是方便起见 —— 并非唯一真相来源。最终运行的是设置里所写的内容。
 
-| 智能体 | 命令 | 跳过标志 |
-|---|---|---|
-| Claude Code | `claude` | `--dangerously-skip-permissions` |
-| Codex | `codex` | `--yolo` |
-| CodeBuddy | `codebuddy` | `-y` |
-| Gemini | `gemini` | `--yolo` |
-| Copilot | `copilot` | `--allow-all` |
-| Cursor | `cursor-agent` | `--force` |
-| Kimi | `kimi` | `--yolo` |
-| Qoder | `qoder` | `--dangerously-skip-permissions` |
-| Hermes | `hermes` | `--yolo` |
-| OpenCode | `opencode` | `--auto` |
-| Continue | `cn` | `--auto` |
-| Cline | `cline` | `--auto-approve true` |
-| Goose | `goose` | 环境变量 `GOOSE_MODE=auto` —— 并非标志 |
-| Kilo Code | `kilo` | 无 —— 仅 `kilo run` 接受 |
-| OpenClaw | `openclaw` | 无 —— 仅持久配置 |
-| Pi | `pi` | `--approve` |
-| ZCode | `zcode` | 无 —— 无启动期跳过标志 |
+| 智能体 | 命令 | 跳过标志 | 恢复会话参数 |
+|---|---|---|---|
+| Claude Code | `claude` | `--dangerously-skip-permissions` | `-r` |
+| Codex | `codex` | `--yolo` | `--resume` |
+| CodeBuddy | `codebuddy` | `-y` | `-r` |
+| Gemini | `gemini` | `--yolo` | 无 —— 仅 TUI `/resume` |
+| Copilot | `copilot` | `--allow-all` | `-r` |
+| Cursor | `cursor-agent` | `--force` | `--resume` |
+| Kimi | `kimi` | `--yolo` | `-r` |
+| Qoder | `qoder` | `--dangerously-skip-permissions` | 无 —— 未实现 |
+| Hermes | `hermes` | `--yolo` | `-r` |
+| OpenCode | `opencode` | `--auto` | 无 —— 仅 TUI `/resume` |
+| Continue | `cn` | `--auto` | 无 |
+| Cline | `cline` | `--auto-approve true` | `--taskId` |
+| Goose | `goose` | 环境变量 `GOOSE_MODE=auto` —— 并非标志 | `-r` |
+| Kilo Code | `kilo` | 无 —— 仅 `kilo run` 接受 | 无 |
+| OpenClaw | `openclaw` | 无 —— 仅持久配置 | 无 —— `openclaw resume` 子命令 |
+| Pi | `pi` | `--approve` | `-r` |
+| TraeCode | `traecli` | 无 | `--resume` |
+| ZCode | `zcode` | 无 —— 无启动期跳过标志 | 无 —— 仅 TUI `/resume` |
 
 任何未列出的工具都可以作为自定义工具正常使用;只需自己填好它的标志即可。
 
@@ -238,8 +256,7 @@ grep "AI Agents Extender" "$env:LOCALAPPDATA\JetBrains\IntelliJIdea<version>\log
 请对该行执行一次设置中的 **Validate**,或检查该命令在启动 IDE 的那个 shell 中能否解析
 (IDE 可能继承了与你交互式 shell 不同的 `PATH`)。
 
-**标志没有被应用。** 确认 YOLO 开关已打开,且该行配置了跳过标志。每次启动的日志行会显示最终命令,
-包括是否有内容被注入。
+**标志没有被应用。** 确认对应的开关已打开(跳过权限对应 YOLO(跳过权限) 开关,恢复会话对应 Resume Session 开关),且该行在该列中配置了值。每次启动的日志行会显示最终命令,包括是否有内容被注入。
 
 **某个打印出来的路径 / 类型名不可点击。** 链接只在该引用能解析为当前项目中真实存在的文件或类时才出现
 (因此随机的单词不会被链起来)。请确保文件位于内容根(content root)内,且对于类型名,Java 模块已启用。
