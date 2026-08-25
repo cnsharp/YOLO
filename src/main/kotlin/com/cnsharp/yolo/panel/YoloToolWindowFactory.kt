@@ -29,8 +29,10 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
+import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.ContentFactory
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
 import com.jediterm.core.util.TermSize
 import com.jediterm.terminal.ProcessTtyConnector
 import com.jediterm.terminal.ui.settings.DefaultSettingsProvider
@@ -43,6 +45,8 @@ import com.pty4j.WinSize
 import com.cnsharp.yolo.terminal.YoloColorPalette
 import com.cnsharp.yolo.terminal.YoloJediTermWidget
 import java.awt.BorderLayout
+import java.awt.CardLayout
+import java.awt.FlowLayout
 import java.awt.Font
 import java.awt.Rectangle
 import java.awt.KeyboardFocusManager
@@ -54,7 +58,11 @@ import java.beans.PropertyChangeListener
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.JButton
+import javax.swing.JComponent
+import javax.swing.BoxLayout
 import javax.swing.JPanel
+import javax.swing.ScrollPaneConstants
+import javax.swing.SwingConstants
 import javax.swing.SwingUtilities
 import kotlin.math.max
 import kotlin.math.min
@@ -65,8 +73,9 @@ import kotlin.math.roundToInt
  * Terminal's "AI Agents" dropdown experience without using any internal Terminal API.
  *
  * The panel shows a global "Skip permissions" toggle and a settings gear in its header, and an **agents
- * dropdown** (icon + name) that mirrors the Terminal's AI Agents selector. Selecting an agent immediately
- * opens its interactive terminal — a real PTY — inside the panel, so the agent's TUI runs in place.
+ * dropdown** (icon + name) that mirrors the Terminal's AI Agents selector. Clicking **Launch** opens the
+ * selected agent in a new **tab** — a real PTY — inside the panel, so several agents can run side by side
+ * like IDEA's built-in Terminal and the user switches between them with the tabs.
  *
  * The terminal is a third-party, fully public component (JediTerm + PTY4J, bundled with the IntelliJ
  * Platform), so no `@ApiStatus.Internal` / `@Experimental` Terminal API is touched and the plugin stays
@@ -162,6 +171,11 @@ private class YoloPanel(
     private val project: Project
 ) : JBPanel<YoloPanel>(), Disposable {
 
+    private companion object {
+        /** CardLayout key for [contentArea]: the empty placeholder shown before any terminal is launched. */
+        const val CARD_EMPTY = "empty"
+    }
+
     private val LOG = Logger.getInstance(YoloPanel::class.java)
 
     private val agentCombo = ComboBox<AgentRow>().apply {
@@ -176,11 +190,74 @@ private class YoloPanel(
         }
     }
 
-    /** Holds the live terminal widget; swapped on each agent launch. */
-    private val terminalHolder = JBPanel<JBPanel<*>>(BorderLayout())
+    /** Placeholder shown until the first agent is launched (mirrors IDEA's empty Terminal). */
+    private val emptyPlaceholder = JBLabel(message("panel.emptyHint")).apply {
+        horizontalAlignment = SwingConstants.CENTER
+    }
 
-    private var currentWidget: YoloJediTermWidget? = null
-    private var currentProcess: Process? = null
+    /** Each launched agent gets its own card in [contentArea]; [tabBar] shows a clickable header per tab. */
+    private val cardLayout = CardLayout()
+
+    /** Hosts the empty hint or the currently selected terminal widget (one card per session). */
+    private val contentArea = JBPanel<JBPanel<*>>(cardLayout).apply {
+        add(emptyPlaceholder, CARD_EMPTY)
+    }
+
+    /** The clickable tab strip above [contentArea]; one entry per open session. Laid out left-to-right
+     *  with [BoxLayout] (never wraps) so a horizontal scrollbar appears in [tabBarScroll] once tabs overflow. */
+    private val tabBar = JBPanel<JBPanel<*>>().apply {
+        layout = BoxLayout(this, BoxLayout.X_AXIS)
+        isOpaque = true
+        background = UIUtil.getPanelBackground()
+        border = JBUI.Borders.customLine(UIUtil.getBoundsColor(), 0, 0, 1, 0)
+    }
+
+    /** Horizontal-only scroll wrapper for [tabBar] so many open agents stay reachable. */
+    private val tabBarScroll = JBScrollPane(
+        tabBar,
+        ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER,
+        ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED
+    ).apply {
+        border = JBUI.Borders.empty()
+        isOpaque = false
+        viewport.isOpaque = false
+    }
+
+    /**
+     * Vertical split: tab strip on top, terminal cards below. Replaces the Swing JTabbedPane, whose custom
+     * tab components are NOT painted by IntelliJ's DarculaTabbedPaneUI — so tabs came up with no visible
+     * title, border, or close button. The hand-built strip is fully theme-aware and always renders.
+     */
+    private val terminalSplit = JBPanel<JBPanel<*>>(BorderLayout(0, JBUI.scale(4))).apply {
+        add(tabBarScroll, BorderLayout.NORTH)
+        add(contentArea, BorderLayout.CENTER)
+    }
+
+    /** All currently open terminal sessions, in tab order. */
+    private val sessions = mutableListOf<Session>()
+
+    /** Index of the selected session in [sessions], or -1 when none is open. */
+    private var selectedIndex = -1
+
+    /** Monotonic id source for per-session card keys (stable across closes, unlike list indices). */
+    private var sessionSeq = 0
+
+    /** The session shown in the currently selected tab. */
+    private fun activeSession(): Session? {
+        return if (selectedIndex in sessions.indices) sessions[selectedIndex] else null
+    }
+
+    /** The terminal widget of the currently selected tab (drives scale + Ctrl+C targeting). */
+    private fun activeWidget(): YoloJediTermWidget? = activeSession()?.widget
+
+    /** One open terminal: its widget, its PTY process, the agent row, its tab header, and its card key. */
+    private data class Session(
+        val widget: YoloJediTermWidget,
+        val process: Process,
+        val row: AgentRow,
+        val tabComp: JComponent,
+        val cardKey: String
+    )
 
     /**
      * Guards against stale asynchronous refresh results. Each [rebuild] bumps the generation; only the
@@ -194,7 +271,7 @@ private class YoloPanel(
      * change the component's pixel size, so JediTerm never recomputes its grid and its cached image goes
      * stale — leaving ghost artifacts. We force a recompute ourselves.
      */
-    private val scaleChangeListener = PropertyChangeListener { currentWidget?.forceReinitFull() }
+    private val scaleChangeListener = PropertyChangeListener { activeWidget()?.forceReinitFull() }
 
     /**
      * Intercepts Ctrl+C while the embedded terminal has focus so the keystroke reaches the PTY as SIGINT
@@ -219,7 +296,7 @@ private class YoloPanel(
                 (InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK or InputEvent.ALT_DOWN_MASK or InputEvent.META_DOWN_MASK)
             if (mods != InputEvent.CTRL_DOWN_MASK || e.keyCode != KeyEvent.VK_C) return false
 
-            val panel = currentWidget?.getTerminalPanel() ?: return false
+            val panel = activeWidget()?.getTerminalPanel() ?: return false
             val focus = KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner ?: return false
             if (!SwingUtilities.isDescendingFrom(focus, panel)) return false
 
@@ -262,16 +339,11 @@ private class YoloPanel(
             add(toolbar.component, BorderLayout.EAST)
         }
 
-        // Placeholder shown until the user picks an agent and clicks Launch.
-        terminalHolder.add(
-            JBLabel("Select an agent above, then click Launch to start its terminal").apply {
-                horizontalAlignment = javax.swing.SwingConstants.CENTER
-            },
-            BorderLayout.CENTER
-        )
+        // Start on the placeholder card; the first Launch adds a real terminal card.
+        cardLayout.show(contentArea, CARD_EMPTY)
 
         add(header, BorderLayout.NORTH)
-        add(terminalHolder, BorderLayout.CENTER)
+        add(terminalSplit, BorderLayout.CENTER)
 
         // Track OS display-scale changes so the embedded terminal can recompute (see scaleChangeListener).
         Toolkit.getDefaultToolkit().addPropertyChangeListener("awt.font.desktophints", scaleChangeListener)
@@ -477,7 +549,7 @@ private class YoloPanel(
                         // Add to a laid-out container and force a grid recompute first, then start — so the
                         // terminal's character grid is sized to the real component and a scale change later
                         // triggers a clean recompute (no ghost artifacts).
-                        swapTerminal(widget, process)
+                        addTerminalSession(widget, process, row)
                         widget.start()
                         // Hand keyboard focus to the terminal so the caret lands in the agent's
                         // panel (user can type immediately) and Ctrl+C is delivered to the terminal
@@ -493,32 +565,126 @@ private class YoloPanel(
         }
     }
 
-    /** Replace the live terminal with a freshly started one. */
-    private fun swapTerminal(widget: YoloJediTermWidget, process: Process) {
-        currentWidget?.close()
-        currentProcess?.let { runCatching { it.destroyForcibly() } }
-        terminalHolder.removeAll()
-        terminalHolder.add(widget, BorderLayout.CENTER)
+    /**
+     * Open a fresh terminal tab for the just-launched agent. Each Launch adds a new tab (it never
+     * replaces an existing terminal), so several agents can run side by side and the user switches
+     * between them like IDEA's built-in Terminal tabs.
+     */
+    private fun addTerminalSession(widget: YoloJediTermWidget, process: Process, row: AgentRow) {
+        val cardKey = "session-${sessionSeq++}"
+        contentArea.add(widget, cardKey)
+        val tabComp = buildTabComponent(row, widget)
+        tabBar.add(tabComp)
+        sessions.add(Session(widget, process, row, tabComp, cardKey))
+        selectedIndex = sessions.lastIndex
+        cardLayout.show(contentArea, cardKey)
+        updateTabSelection()
 
         // JediTerm's own TerminalPanel handles ongoing resizes itself: its built-in `componentResized`
         // listener recomputes the grid (sizeTerminalFromComponent) without re-deriving the font — so text
-        // stays sharp on HiDPI — and recreates the backing image via postResize, so no ghost glyphs. We do
-        // NOT add a second resize listener: doing so double-fires and makes the panel laggy.
+        // stays sharp on HiDPI — and recreates the backing image via postResize, so no ghost glyphs.
         //
         // The only thing we drive manually is the *initial* grid, which YoloTerminalPanel recomputes once
-        // the first time it reaches a real (non-zero) size. OS display-scale changes are handled by
-        // forceReinitFull() via the scaleChangeListener above.
-        terminalHolder.revalidate()
-        terminalHolder.repaint()
+        // the first time it reaches a real (non-zero) size. We add to a laid-out card first so the
+        // widget has real dimensions to size against, then start.
+        tabBarScroll.revalidate()
+        tabBarScroll.repaint()
+        contentArea.revalidate()
+        SwingUtilities.invokeLater { widget.getTerminalPanel().requestFocusInWindow() }
+    }
 
-        currentWidget = widget
-        currentProcess = process
+    /** Repaint every tab header so the selected one is highlighted and the rest are flat. */
+    private fun updateTabSelection() {
+        for (i in sessions.indices) {
+            sessions[i].tabComp.background =
+                if (i == selectedIndex) UIUtil.getListBackground(true) else UIUtil.getPanelBackground()
+        }
+        activeWidget()?.forceReinitFull()
+    }
+
+    /** Select the session at [index] (switch the visible card + highlight its header). */
+    private fun selectTab(index: Int) {
+        if (index !in sessions.indices) return
+        selectedIndex = index
+        cardLayout.show(contentArea, sessions[index].cardKey)
+        updateTabSelection()
+    }
+
+    /** Select the session whose widget matches [widget] (tab headers are matched by widget, which is stable). */
+    private fun selectByWidget(widget: YoloJediTermWidget) {
+        val i = sessions.indexOfFirst { it.widget == widget }
+        if (i >= 0) selectTab(i)
+    }
+
+    /** Build one entry of the tab strip: agent icon + name + a close (✕) button that tears down that session. */
+    private fun buildTabComponent(row: AgentRow, widget: YoloJediTermWidget): JComponent {
+        val icon = if (row.command.isBlank()) null else AgentIcons.forAgent(row.id, row.iconPath)
+        val nameLabel = JBLabel(row.displayName, icon, SwingConstants.LEFT).apply {
+            // Pin an explicit, theme-aware foreground so the name is always readable regardless of LaF.
+            foreground = UIUtil.getLabelForeground()
+        }
+        val closeBtn = JButton("✕").apply {
+            isBorderPainted = false
+            isContentAreaFilled = false
+            isFocusable = false
+            foreground = UIUtil.getLabelForeground()
+            toolTipText = message("panel.closeTab")
+            font = JBUI.Fonts.smallFont()
+            addActionListener {
+                // Look the session up by widget at click time: indices shift when an earlier tab is
+                // closed, but the widget reference is stable, so we always find the right tab.
+                val i = sessions.indexOfFirst { it.widget == widget }
+                if (i >= 0) closeSession(i)
+            }
+        }
+        return JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0)).apply {
+            // Paint an explicit, theme-aware background — unlike a Swing JTabbedPane tab component, this
+            // strip is our own component and is always painted, so the title and close button stay visible.
+            isOpaque = true
+            background = UIUtil.getPanelBackground()
+            // Padding doubles as the gap between adjacent tabs (BoxLayout adds none of its own).
+            border = JBUI.Borders.empty(2, JBUI.scale(4), 2, JBUI.scale(4))
+            add(nameLabel)
+            add(closeBtn)
+            // Clicking the tab body (anywhere but the close button) selects this session.
+            addMouseListener(object : java.awt.event.MouseAdapter() {
+                override fun mouseClicked(e: java.awt.event.MouseEvent) {
+                    if (closeBtn.bounds.contains(e.point)) return
+                    selectByWidget(widget)
+                }
+            })
+        }
+    }
+
+    /** Tear down the session at [index]: kill its PTY, close its widget, and remove its tab. */
+    private fun closeSession(index: Int) {
+        if (index !in sessions.indices) return
+        val session = sessions[index]
+        tabBar.remove(session.tabComp)
+        contentArea.remove(session.widget)
+        sessions.removeAt(index)
+        runCatching { session.widget.close() }
+        runCatching { session.process.destroyForcibly() }
+        if (sessions.isEmpty()) {
+            selectedIndex = -1
+            cardLayout.show(contentArea, CARD_EMPTY)
+        } else {
+            // Keep a neighbour selected after a middle removal (indices shifted, so clamp).
+            selectedIndex = selectedIndex.coerceIn(0, sessions.lastIndex)
+            cardLayout.show(contentArea, sessions[selectedIndex].cardKey)
+        }
+        updateTabSelection()
+        tabBarScroll.revalidate()
+        tabBarScroll.repaint()
     }
 
     override fun dispose() {
         IdeEventQueue.getInstance().removeDispatcher(ctrlCDispatcher)
         Toolkit.getDefaultToolkit().removePropertyChangeListener("awt.font.desktophints", scaleChangeListener)
-        currentWidget?.close()
-        currentProcess?.let { runCatching { it.destroyForcibly() } }
+        sessions.forEach { session ->
+            runCatching { session.widget.close() }
+            runCatching { session.process.destroyForcibly() }
+        }
+        sessions.clear()
     }
 }

@@ -66,6 +66,10 @@ Because selection and execution are separate, the **Skip Permissions** / **Resum
 launch, and changing the dropdown never kills a running terminal. The last agent you launched is remembered and re-selected
 the next time you open the panel.
 
+**Every Launch opens a new tab** — a separate, real PTY — so several agents can run side by side and you switch between
+them with the tabs (like IDEA's built-in Terminal). Each tab has a close (✕) button that tears down that agent's process;
+closing the last tab returns the panel to its empty placeholder.
+
 - **The caret lands in the terminal automatically** when an agent launches, so you can type right away.
 - **Ctrl+C is no longer hijacked by IDEA's Copy shortcut.** With the terminal focused, Ctrl+C passes through to the
   embedded terminal instead of popping IDEA's "Shortcuts conflicts" dialog. Whether it interrupts the running agent
