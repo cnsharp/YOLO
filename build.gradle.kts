@@ -177,3 +177,15 @@ tasks.named("instrumentCode") {
 tasks.named("buildSearchableOptions") {
     enabled = false
 }
+
+// Force a clean before packaging. This repo's `build/` is shared between the main `yolo` build and the
+// `yolo-exp` build (settings.gradle.kts names the project `yolo-exp`, and both variants compile into the
+// same `build/classes/kotlin/main`). Without a clean, a build of one variant repackages the other
+// variant's classes into its jar — e.g. `com.cnsharp.yolo.exp.*` leaked into the main `yolo` jar, so the
+// same class was loaded by two plugin classloaders and `AgentExtenderSettingsExp.getInstance()` threw
+// ClassCastException, taking down the exp settings page. Cleaning first guarantees no stale variant
+// classes are ever packaged. Scoped to `buildPlugin` (the distributable), not `jar`, so dev `runIde`
+// stays incremental. The same guard must also be present in the exp (`com.cnsharp.yolo.exp`) build.gradle.kts.
+tasks.named("buildPlugin") {
+    dependsOn("clean")
+}
