@@ -563,8 +563,11 @@ class AgentExtenderConfigurable : Configurable {
                 )
             }
             // ② Promoted by this plugin (e.g. claude/codex/codebuddy): in AgentRegistry.agents order, read-only, not removable, icon fixed.
+            // Skip any agent already shown as an IDEA built-in (matched by command) to avoid duplicate rows.
             promotedIds = AgentRegistry.agents.map { it.id.lowercase() }.toSet()
             for (def in AgentRegistry.agents) {
+                if (def.id.lowercase() in builtInIds) continue
+                if (baseName(def.command).lowercase() in builtInCmds) continue
                 val baseArgs = state.agentBaseArgs[def.id.lowercase()] ?: ""
                 toolsModel.addRow(
                     arrayOf<Any>(
