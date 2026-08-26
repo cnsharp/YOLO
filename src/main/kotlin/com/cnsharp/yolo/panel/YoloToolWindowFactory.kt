@@ -26,11 +26,13 @@ import com.intellij.openapi.wm.ToolWindowType
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.ui.Messages
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.ContentFactory
+import com.intellij.icons.AllIcons
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import com.jediterm.core.util.TermSize
@@ -61,6 +63,8 @@ import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.BoxLayout
 import javax.swing.JPanel
+import javax.swing.JPopupMenu
+import javax.swing.JMenuItem
 import javax.swing.ScrollPaneConstants
 import javax.swing.SwingConstants
 import javax.swing.SwingUtilities
@@ -223,6 +227,15 @@ private class YoloPanel(
         viewport.isOpaque = false
     }
 
+    /** Dropdown arrow to the right of the settings gear: lists every open terminal for quick switching. */
+    private val tabDropdownBtn = JButton(AllIcons.General.ChevronDown).apply {
+        isBorderPainted = false
+        isContentAreaFilled = false
+        isFocusable = false
+        toolTipText = message("panel.tabDropdown")
+        addActionListener { showTabDropdown() }
+    }
+
     /**
      * Vertical split: tab strip on top, terminal cards below. Replaces the Swing JTabbedPane, whose custom
      * tab components are NOT painted by IntelliJ's DarculaTabbedPaneUI — so tabs came up with no visible
@@ -336,7 +349,11 @@ private class YoloPanel(
                 add(launchBtn, BorderLayout.EAST)
             }
             add(selector, BorderLayout.CENTER)
-            add(toolbar.component, BorderLayout.EAST)
+            val right = JPanel(BorderLayout(JBUI.scale(2), 0)).apply {
+                add(toolbar.component, BorderLayout.CENTER)
+                add(tabDropdownBtn, BorderLayout.EAST)
+            }
+            add(right, BorderLayout.EAST)
         }
 
         // Start on the placeholder card; the first Launch adds a real terminal card.
@@ -641,7 +658,7 @@ private class YoloPanel(
                 // Look the session up by widget at click time: indices shift when an earlier tab is
                 // closed, but the widget reference is stable, so we always find the right tab.
                 val i = sessions.indexOfFirst { it.widget == widget }
-                if (i >= 0) closeSession(i)
+                if (i >= 0 && confirmCloseTab()) closeSession(i)
             }
         }
         return JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0)).apply {
@@ -683,6 +700,36 @@ private class YoloPanel(
         updateTabSelection()
         tabBarScroll.revalidate()
         tabBarScroll.repaint()
+    }
+
+    /** Ask before tearing down a terminal, since closing kills the running PTY process. */
+    private fun confirmCloseTab(): Boolean {
+        return Messages.showYesNoDialog(
+            project,
+            message("panel.closeTabConfirm"),
+            message("panel.closeTabConfirmTitle"),
+            Messages.getQuestionIcon()
+        ) == Messages.YES
+    }
+
+    /**
+     * Toggle-style dropdown to the right of the settings gear: lists every open terminal and switches to
+     * the chosen one. Saves the user from scrolling the overflowing tab strip when many agents are open.
+     * A plain JPopupMenu is used (over JBPopupFactory) because the latter lives in app-client.jar, which
+     * is not on this plugin's compile classpath.
+     */
+    private fun showTabDropdown() {
+        if (sessions.isEmpty()) return
+        val menu = JPopupMenu()
+        sessions.forEachIndexed { i, s ->
+            val item = JMenuItem(s.row.displayName).apply {
+                // The active tab is already shown, so mark it rather than offer a no-op switch.
+                isEnabled = i != selectedIndex
+                addActionListener { selectTab(i) }
+            }
+            menu.add(item)
+        }
+        menu.show(tabDropdownBtn, 0, tabDropdownBtn.height)
     }
 
     override fun dispose() {

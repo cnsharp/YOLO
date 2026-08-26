@@ -169,3 +169,11 @@ tasks.withType<JavaCompile> {
 tasks.named("instrumentCode") {
     enabled = false
 }
+
+// buildSearchableOptions launches a sandboxed IDEA to index settings-search metadata and fails in this
+// environment with ClassNotFoundException (org.jetbrains.plugins.terminal.agent.TerminalAgent) — a known
+// issue unrelated to plugin code. The panel adds no searchable settings, so skipping it is safe and
+// unblocks `buildPlugin`.
+tasks.named("buildSearchableOptions") {
+    enabled = false
+}
