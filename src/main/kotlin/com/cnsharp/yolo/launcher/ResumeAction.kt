@@ -1,6 +1,6 @@
 package com.cnsharp.yolo.launcher
 
-import com.cnsharp.yolo.settings.AgentExtenderSettings
+import com.cnsharp.yolo.settings.AgentExtenderSettingsExp
 import com.cnsharp.yolo.terminal.AgentIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -21,10 +21,10 @@ import com.intellij.openapi.actionSystem.ToggleAction
  * so the platform reads action.<id>.text / .description from YoloBundle and follows IDE language switching. */
 class ResumeAction : ToggleAction() {
     override fun isSelected(e: AnActionEvent): Boolean =
-        AgentExtenderSettings.getInstance().state.resumeEnabled
+        AgentExtenderSettingsExp.getInstance().state.resumeEnabled
 
     override fun setSelected(e: AnActionEvent, state: Boolean) {
-        AgentExtenderSettings.getInstance().state.resumeEnabled = state
+        AgentExtenderSettingsExp.getInstance().state.resumeEnabled = state
     }
 
     /** State only reads the in-memory settings, so it can be safely evaluated on the EDT. */
