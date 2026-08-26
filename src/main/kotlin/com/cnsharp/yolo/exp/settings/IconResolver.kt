@@ -1,6 +1,6 @@
-package com.cnsharp.yolo.settings
+package com.cnsharp.yolo.exp.settings
 
-import com.cnsharp.yolo.YoloBundle.message
+import com.cnsharp.yolo.exp.YoloBundle.message
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.util.IconLoader
 import java.io.File

@@ -1,6 +1,6 @@
-package com.cnsharp.yolo.terminal
+package com.cnsharp.yolo.exp.terminal
 
-import com.cnsharp.yolo.settings.AgentRegistry
+import com.cnsharp.yolo.exp.settings.AgentRegistry
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.IconLoader

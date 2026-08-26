@@ -1,4 +1,4 @@
-package com.cnsharp.yolo.settings
+package com.cnsharp.yolo.exp.settings
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread

@@ -1,4 +1,4 @@
-package com.cnsharp.yolo.settings
+package com.cnsharp.yolo.exp.settings
 
 import com.intellij.openapi.util.SystemInfo
 import java.io.File

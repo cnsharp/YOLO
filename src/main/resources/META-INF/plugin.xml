@@ -30,9 +30,9 @@
     <resource-bundle>messages.YoloBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <applicationService serviceImplementation="com.cnsharp.yolo.settings.AgentExtenderSettingsExp"/>
+        <applicationService serviceImplementation="com.cnsharp.yolo.exp.settings.AgentExtenderSettingsExp"/>
         <!-- displayName is omitted: key points to YoloBundle's plugin.name, so the product name is maintained only in that one place -->
-        <applicationConfigurable instance="com.cnsharp.yolo.settings.AgentExtenderConfigurable"
+        <applicationConfigurable instance="com.cnsharp.yolo.exp.settings.AgentExtenderConfigurable"
                       groupId="tools"
                       key="plugin.name"
                       bundle="messages.YoloBundle"
@@ -47,12 +47,12 @@
          the per-line suppression of that inspection. -->
     <extensions defaultExtensionNs="org.jetbrains.plugins.terminal">
         <!-- suppress PluginXmlApiIsInternal -->
-        <terminalAgentProvider implementation="com.cnsharp.yolo.terminal.CustomTerminalAgentProvider"/>
+        <terminalAgentProvider implementation="com.cnsharp.yolo.exp.terminal.CustomTerminalAgentProvider"/>
         <!-- suppress PluginXmlApiIsInternal -->
-        <shellExecOptionsCustomizer implementation="com.cnsharp.yolo.terminal.TerminalSkipFlagCustomizer"/>
+        <shellExecOptionsCustomizer implementation="com.cnsharp.yolo.exp.terminal.TerminalSkipFlagCustomizer"/>
         <!-- order=last: must run after the terminal's own Initializer, otherwise setTitleActions would be overwritten -->
         <!-- suppress PluginXmlApiIsInternal -->
-        <toolWindowInitializer implementation="com.cnsharp.yolo.terminal.SkipToggleToolWindowInitializer"
+        <toolWindowInitializer implementation="com.cnsharp.yolo.exp.terminal.SkipToggleToolWindowInitializer"
                                order="last"/>
     </extensions>
 
@@ -61,10 +61,10 @@
         <!-- text/description omitted: resolved by the <resource-bundle> above via
              action.com.cnsharp.yolo.exp.SkipPermissionsAction.text/.description -->
         <action id="com.cnsharp.yolo.exp.SkipPermissionsAction"
-                class="com.cnsharp.yolo.launcher.SkipPermissionsAction"/>
+                class="com.cnsharp.yolo.exp.launcher.SkipPermissionsAction"/>
         <action id="com.cnsharp.yolo.exp.ResumeAction"
-                class="com.cnsharp.yolo.launcher.ResumeAction"/>
+                class="com.cnsharp.yolo.exp.launcher.ResumeAction"/>
         <action id="com.cnsharp.yolo.exp.OpenSettingsAction"
-                class="com.cnsharp.yolo.settings.OpenSettingsAction"/>
+                class="com.cnsharp.yolo.exp.settings.OpenSettingsAction"/>
     </actions>
 </idea-plugin>
