@@ -471,6 +471,13 @@ private class YoloPanel(
 
         // Inherit the OS environment and inject any env-based bypass (e.g. goose's GOOSE_MODE).
         val env = HashMap(System.getenv())
+        // The IDE is a GUI app launched without a terminal, so its environment usually lacks TERM /
+        // COLORTERM. TUIs key their colour support off these (e.g. claude needs COLORTERM=truecolor for
+        // its truecolour logo); without them the agent renders monochrome. Set sensible defaults so the
+        // spawned PTY child emits colour just like a normal interactive terminal would.
+        env.putIfAbsent("TERM", "xterm-256color")
+        env["COLORTERM"] = "truecolor"
+        env.putIfAbsent("CLICOLOR", "1")
         val envPair = AgentRegistry.skipEnvFor(baseName(row.command))
         if (settings.skipEnabled && (row.skipFlag.isNotBlank() || envPair != null)) {
             // The flag may be multiple tokens (e.g. cline's "--auto-approve true"), so it must be split into
