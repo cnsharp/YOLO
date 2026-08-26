@@ -281,7 +281,12 @@ private class YoloPanel(
      * Only the real terminal panel is affected — the dropdown, toolbar and the rest of the IDE keep their
      * normal Ctrl+C behavior. ⌘C (macOS Copy) is left untouched because we require a plain Ctrl modifier.
      */
-    private val ctrlCDispatcher = object : IdeEventQueue.NonLockedEventDispatcher {
+    // Implement the base `IdeEventQueue.EventDispatcher` (not `NonLockedEventDispatcher`): the latter was
+    // introduced after our since-build 233, so the plugin verifier reports it as an unresolved class on
+    // 2023.3. The base interface has existed since long before 233 and exposes the same `dispatch` hook.
+    // The only behavioural difference is that `NonLockedEventDispatcher` skips invocation while the event
+    // queue is locked (modal dialogs / write actions); for Ctrl+C key interception that's irrelevant.
+    private val ctrlCDispatcher = object : IdeEventQueue.EventDispatcher {
         override fun dispatch(e: AWTEvent): Boolean {
             if (e !is KeyEvent || e.id != KeyEvent.KEY_PRESSED) return false
             // Plain Ctrl+C only — no Shift/Alt/Meta. Meta (⌘) is left to IDEA's Copy on macOS.
