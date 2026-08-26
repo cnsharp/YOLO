@@ -1,76 +1,56 @@
 package com.cnsharp.yolo.panel
 
 import com.cnsharp.yolo.YoloBundle.message
-import com.cnsharp.yolo.launcher.SkipPermissionsAction
-import com.cnsharp.yolo.launcher.ResumeAction
-import com.cnsharp.yolo.settings.AgentExtenderSettings
-import com.cnsharp.yolo.settings.AgentExtenderSettingsListener
-import com.cnsharp.yolo.settings.AgentRegistry
-import com.cnsharp.yolo.settings.InstalledAgents
-import com.cnsharp.yolo.settings.OpenSettingsAction
-import com.cnsharp.yolo.terminal.AgentIcons
-import com.cnsharp.yolo.util.baseName
 import com.cnsharp.yolo.YoloConstants
+import com.cnsharp.yolo.launcher.ResumeAction
+import com.cnsharp.yolo.launcher.SkipPermissionsAction
+import com.cnsharp.yolo.settings.*
+import com.cnsharp.yolo.terminal.AgentIcons
+import com.cnsharp.yolo.terminal.YoloColorPalette
+import com.cnsharp.yolo.terminal.YoloJediTermWidget
+import com.cnsharp.yolo.util.baseName
+import com.intellij.icons.AllIcons
+import com.intellij.ide.IdeEventQueue
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
-import com.intellij.ide.IdeEventQueue
+import com.intellij.openapi.ui.ComboBox
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.openapi.wm.ToolWindowType
 import com.intellij.openapi.wm.WindowManager
-import com.intellij.openapi.ui.ComboBox
-import com.intellij.openapi.editor.colors.EditorColorsManager
-import com.intellij.openapi.ui.Messages
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.ContentFactory
-import com.intellij.icons.AllIcons
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import com.jediterm.core.util.TermSize
 import com.jediterm.terminal.ProcessTtyConnector
-import com.jediterm.terminal.ui.settings.DefaultSettingsProvider
 import com.jediterm.terminal.TerminalColor
 import com.jediterm.terminal.TextStyle
 import com.jediterm.terminal.emulator.ColorPalette
+import com.jediterm.terminal.ui.settings.DefaultSettingsProvider
 import com.pty4j.PtyProcess
 import com.pty4j.PtyProcessBuilder
 import com.pty4j.WinSize
-import com.cnsharp.yolo.terminal.YoloColorPalette
-import com.cnsharp.yolo.terminal.YoloJediTermWidget
-import java.awt.BorderLayout
-import java.awt.CardLayout
-import java.awt.FlowLayout
-import java.awt.Font
-import java.awt.Rectangle
-import java.awt.KeyboardFocusManager
-import java.awt.Toolkit
-import java.awt.AWTEvent
+import java.awt.*
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.beans.PropertyChangeListener
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
-import javax.swing.JButton
-import javax.swing.JComponent
-import javax.swing.BoxLayout
-import javax.swing.JPanel
-import javax.swing.JPopupMenu
-import javax.swing.JMenuItem
-import javax.swing.ScrollPaneConstants
-import javax.swing.SwingConstants
-import javax.swing.SwingUtilities
+import javax.swing.*
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.roundToInt
 
 /**
  * The standalone YOLO panel — a public ToolWindowFactory (registered in plugin.xml) that replicates the
@@ -184,7 +164,7 @@ private class YoloPanel(
 
     private val agentCombo = ComboBox<AgentRow>().apply {
         renderer = object : SimpleListCellRenderer<AgentRow>() {
-            override fun customize(list: javax.swing.JList<out AgentRow>, value: AgentRow?, index: Int, selected: Boolean, hasFocus: Boolean) {
+            override fun customize(list: JList<out AgentRow>, value: AgentRow?, index: Int, selected: Boolean, hasFocus: Boolean) {
                 if (value != null) {
                     // The "AI Agents" prompt item carries no command, so it shows no agent icon.
                     icon = if (value.command.isBlank()) null else AgentIcons.forAgent(value.id, value.iconPath)
@@ -661,15 +641,18 @@ private class YoloPanel(
                 if (i >= 0 && confirmCloseTab()) closeSession(i)
             }
         }
-        return JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0)).apply {
+        val tab = JPanel(BorderLayout(JBUI.scale(8), 0)).apply {
             // Paint an explicit, theme-aware background — unlike a Swing JTabbedPane tab component, this
             // strip is our own component and is always painted, so the title and close button stay visible.
             isOpaque = true
             background = UIUtil.getPanelBackground()
             // Padding doubles as the gap between adjacent tabs (BoxLayout adds none of its own).
-            border = JBUI.Borders.empty(2, JBUI.scale(4), 2, JBUI.scale(4))
-            add(nameLabel)
-            add(closeBtn)
+            // Right inset is kept small so the close (✕) sits right at the tab edge.
+            border = JBUI.Borders.empty(2, JBUI.scale(4), 2, JBUI.scale(2))
+            // Name pinned to the left, close (✕) pinned to the right edge of the tab so it stays
+            // right-aligned regardless of how long the agent name is.
+            add(nameLabel, BorderLayout.WEST)
+            add(closeBtn, BorderLayout.EAST)
             // Clicking the tab body (anywhere but the close button) selects this session.
             addMouseListener(object : java.awt.event.MouseAdapter() {
                 override fun mouseClicked(e: java.awt.event.MouseEvent) {
@@ -678,6 +661,16 @@ private class YoloPanel(
                 }
             })
         }
+        // tabBar is a BoxLayout(X_AXIS), which sizes each tab to its *content* — so without an explicit
+        // width the close button hugs the name instead of sitting at the tab's right edge. Pin a minimum
+        // tab width (growing for long names so they never clip) and cap the maximum so BoxLayout can't
+        // stretch the tab to fill the strip. The name stays left and the ✕ is pushed to the right edge.
+        val contentW = nameLabel.preferredSize.width + JBUI.scale(8) + closeBtn.preferredSize.width
+        val tabW = contentW.coerceAtLeast(JBUI.scale(160))
+        tab.minimumSize = Dimension(tabW, tab.minimumSize.height)
+        tab.preferredSize = Dimension(tabW, tab.preferredSize.height)
+        tab.maximumSize = Dimension(tabW, tab.maximumSize.height)
+        return tab
     }
 
     /** Tear down the session at [index]: kill its PTY, close its widget, and remove its tab. */
