@@ -1,7 +1,7 @@
-package com.cnsharp.yolo.terminal
+package com.cnsharp.yolo.exp.terminal
 
-import com.cnsharp.yolo.settings.AgentExtenderSettingsExp
-import com.cnsharp.yolo.settings.AgentExtenderSettingsListener
+import com.cnsharp.yolo.exp.settings.AgentExtenderSettingsExp
+import com.cnsharp.yolo.exp.settings.AgentExtenderSettingsListener
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.application.ApplicationManager

@@ -1,8 +1,8 @@
-package com.cnsharp.yolo.terminal
+package com.cnsharp.yolo.exp.terminal
 
-import com.cnsharp.yolo.util.baseName
-import com.cnsharp.yolo.settings.AgentExtenderSettingsExp
-import com.cnsharp.yolo.settings.AgentRegistry
+import com.cnsharp.yolo.exp.util.baseName
+import com.cnsharp.yolo.exp.settings.AgentExtenderSettingsExp
+import com.cnsharp.yolo.exp.settings.AgentRegistry
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import org.jetbrains.plugins.terminal.startup.MutableShellExecOptions

@@ -1,7 +1,7 @@
-package com.cnsharp.yolo.launcher
+package com.cnsharp.yolo.exp.launcher
 
-import com.cnsharp.yolo.settings.AgentExtenderSettingsExp
-import com.cnsharp.yolo.terminal.AgentIcons
+import com.cnsharp.yolo.exp.settings.AgentExtenderSettingsExp
+import com.cnsharp.yolo.exp.terminal.AgentIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.ToggleAction

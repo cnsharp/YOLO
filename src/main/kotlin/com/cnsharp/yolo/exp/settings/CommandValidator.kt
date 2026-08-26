@@ -1,6 +1,6 @@
-package com.cnsharp.yolo.settings
+package com.cnsharp.yolo.exp.settings
 
-import com.cnsharp.yolo.YoloBundle.message
+import com.cnsharp.yolo.exp.YoloBundle.message
 
 /**
  * Validate whether a custom tool's "command" is usable: confirm it can actually be executed

@@ -1,8 +1,8 @@
-package com.cnsharp.yolo.settings
+package com.cnsharp.yolo.exp.settings
 
-import com.cnsharp.yolo.Yolo
-import com.cnsharp.yolo.YoloBundle.message
-import com.cnsharp.yolo.terminal.AgentIcons
+import com.cnsharp.yolo.exp.Yolo
+import com.cnsharp.yolo.exp.YoloBundle.message
+import com.cnsharp.yolo.exp.terminal.AgentIcons
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.application.ApplicationManager
@@ -18,7 +18,7 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.components.panels.HorizontalLayout
 import com.intellij.ui.table.JBTable
-import com.cnsharp.yolo.util.baseName
+import com.cnsharp.yolo.exp.util.baseName
 import com.intellij.util.ui.FormBuilder
 import org.jetbrains.plugins.terminal.agent.TerminalAgent
 import javax.swing.event.TableModelEvent

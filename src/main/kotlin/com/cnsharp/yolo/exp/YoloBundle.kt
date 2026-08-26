@@ -1,4 +1,4 @@
-package com.cnsharp.yolo
+package com.cnsharp.yolo.exp
 
 import com.intellij.DynamicBundle
 import org.jetbrains.annotations.Nls

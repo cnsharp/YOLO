@@ -1,4 +1,4 @@
-package com.cnsharp.yolo.settings
+package com.cnsharp.yolo.exp.settings
 
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken

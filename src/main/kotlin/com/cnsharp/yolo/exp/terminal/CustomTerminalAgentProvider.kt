@@ -1,7 +1,7 @@
-package com.cnsharp.yolo.terminal
+package com.cnsharp.yolo.exp.terminal
 
-import com.cnsharp.yolo.settings.AgentExtenderSettingsExp
-import com.cnsharp.yolo.settings.CustomTool
+import com.cnsharp.yolo.exp.settings.AgentExtenderSettingsExp
+import com.cnsharp.yolo.exp.settings.CustomTool
 import org.jetbrains.plugins.terminal.agent.TerminalAgent
 import org.jetbrains.plugins.terminal.agent.TerminalAgentProvider
 import javax.swing.Icon
