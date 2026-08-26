@@ -11,7 +11,7 @@ import com.intellij.terminal.frontend.action.TerminalAgentsAvailabilityService
 import org.jetbrains.plugins.terminal.TerminalToolWindowInitializer
 
 /**
- * Place the "Skip permissions" checkbox and the settings gear on either side of the AI Agents dropdown.
+ * Place the "Skip permissions" and "Resume session" checkboxes and the settings gear around the AI Agents dropdown.
  *
  * The terminal frontend's TerminalToolWindowTabsManagerImpl$Initializer runs via the
  * toolWindowInitializer extension point and calls
@@ -37,19 +37,26 @@ class SkipToggleToolWindowInitializer : TerminalToolWindowInitializer {
             return
         }
 
+        // A missing resume toggle is not fatal: the dropdown and skip checkbox are still installed.
+        val resumeAction = am.getAction(RESUME_ACTION_ID)
+        if (resumeAction == null) {
+            LOG.warn("AI Agents Extender: action $RESUME_ACTION_ID not found, resume toggle cannot be installed")
+        }
+
         val agentActions: List<AnAction> = AI_AGENTS_ACTION_IDS.mapNotNull { am.getAction(it) }
         if (agentActions.isEmpty()) {
             LOG.warn("AI Agents Extender: AI Agents actions not found, toggle cannot be installed")
             return
         }
 
-        // A missing settings gear is not fatal: the dropdown and checkbox are still installed, just one entry point short.
+        // A missing settings gear is not fatal: the dropdown and checkboxes are still installed, just one entry point short.
         val settingsAction = am.getAction(SETTINGS_ACTION_ID)
         if (settingsAction == null) {
             LOG.warn("AI Agents Extender: action $SETTINGS_ACTION_ID not found, settings button cannot be installed")
         }
 
-        val titleActions = listOf(skipAction) + agentActions + listOfNotNull(settingsAction)
+        // Arrange: skip checkbox -> resume checkbox -> AI Agents dropdown -> settings gear.
+        val titleActions = listOf(skipAction) + listOfNotNull(resumeAction) + agentActions + listOfNotNull(settingsAction)
         toolWindow.setTitleActions(titleActions)
         LOG.info("AI Agents Extender: installed terminal title actions (${titleActions.size} items)")
     }
@@ -76,6 +83,7 @@ class SkipToggleToolWindowInitializer : TerminalToolWindowInitializer {
         private val LOG = Logger.getInstance(SkipToggleToolWindowInitializer::class.java)
 
         private const val SKIP_ACTION_ID = "com.cnsharp.yolo.exp.SkipPermissionsAction"
+        private const val RESUME_ACTION_ID = "com.cnsharp.yolo.exp.ResumeAction"
         private const val SETTINGS_ACTION_ID = "com.cnsharp.yolo.exp.OpenSettingsAction"
 
         /** The three actions of the AI Agents dropdown, ordered consistently with the terminal frontend. */

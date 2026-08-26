@@ -9,8 +9,8 @@ import com.intellij.openapi.actionSystem.ToggleAction
 /**
  * Global "Resume session" toggle state (stored in Settings).
  *
- * Shown in the YOLO panel header (added by YoloToolWindowFactory) as a toolbar ToggleAction, next to the
- * "Skip permissions" toggle and the settings gear.
+ * Installed into the Terminal tool window title bar by SkipToggleToolWindowInitializer (order="last") via the
+ * toolWindowInitializer extension point, next to the "Skip permissions" toggle and left of the AI Agents dropdown.
  *
  * When on, the selected agent is launched with its `resumeFlag` (from agents.json) appended to the command,
  * so the agent resumes the most recent (or a chosen) session. Agents without a resumeFlag are launched normally.

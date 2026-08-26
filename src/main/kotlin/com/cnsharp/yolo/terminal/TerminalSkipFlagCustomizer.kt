@@ -57,6 +57,21 @@ class TerminalSkipFlagCustomizer : ShellExecOptionsCustomizer {
             if (tokens.isNotEmpty() && tokens[0] !in command) extra += tokens
         }
 
+        // Only append the resume args when the toolbar "Resume session" (R) checkbox is on. Resolve the flag
+        // from the per-tool resume rules (custom tools) first, falling back to the agent registry (agents.json)
+        // for built-in/promoted agents. Agents without a resume flag are launched unchanged. Same multi-token
+        // splitting as above so a flag like "--taskId 123" is appended as separate argv entries.
+        if (state.resumeEnabled) {
+            val resumeRuleFlag = state.resumeRules.firstOrNull { r ->
+                baseName(r.agentId).equals(exeName, ignoreCase = true)
+            }?.flag?.takeIf { it.isNotBlank() }
+            val resumeFlag = resumeRuleFlag ?: AgentRegistry.resumeFlagFor(exeName)
+            if (resumeFlag.isNotBlank()) {
+                val tokens = resumeFlag.split(' ').filter { it.isNotBlank() }
+                if (tokens.isNotEmpty() && tokens[0] !in command) extra += tokens
+            }
+        }
+
         // A few agents (e.g. goose) have no skip arg and only recognize an env var; it must be set before the
         // process starts, not appended to the command line — otherwise it would just become a positional argument.
         if (state.skipEnabled) {
@@ -67,12 +82,12 @@ class TerminalSkipFlagCustomizer : ShellExecOptionsCustomizer {
         }
 
         if (extra.isEmpty()) {
-            LOG.info("AI Agents Extender: agent=$exeName skipEnabled=${state.skipEnabled} no args injected, command=$command")
+            LOG.info("AI Agents Extender: agent=$exeName skipEnabled=${state.skipEnabled} resumeEnabled=${state.resumeEnabled} no args injected, command=$command")
             return
         }
 
         val newCommand = command + extra
-        LOG.info("AI Agents Extender: agent=$exeName skipEnabled=${state.skipEnabled} injected=$extra, command=$newCommand")
+        LOG.info("AI Agents Extender: agent=$exeName skipEnabled=${state.skipEnabled} resumeEnabled=${state.resumeEnabled} injected=$extra, command=$newCommand")
         options.setExecCommand(ShellExecCommandImpl(newCommand))
     }
 
