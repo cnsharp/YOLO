@@ -2,7 +2,7 @@ package com.cnsharp.yolo.terminal
 
 import com.cnsharp.yolo.util.baseName
 import com.cnsharp.yolo.settings.AgentExtenderSettingsExp
-import com.cnsharp.yolo.settings.DefaultSkipEnvs
+import com.cnsharp.yolo.settings.AgentRegistry
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import org.jetbrains.plugins.terminal.startup.MutableShellExecOptions
@@ -60,7 +60,7 @@ class TerminalSkipFlagCustomizer : ShellExecOptionsCustomizer {
         // A few agents (e.g. goose) have no skip arg and only recognize an env var; it must be set before the
         // process starts, not appended to the command line — otherwise it would just become a positional argument.
         if (state.skipEnabled) {
-            DefaultSkipEnvs.forId(exeName)?.let { (name, value) ->
+            AgentRegistry.skipEnvFor(exeName)?.let { (name, value) ->
                 options.setEnvironmentVariable(name, value)
                 LOG.info("AI Agents Extender: agent=$exeName injected env var $name=$value")
             }
