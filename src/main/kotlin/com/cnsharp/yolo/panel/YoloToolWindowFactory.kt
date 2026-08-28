@@ -617,8 +617,15 @@ private class YoloPanel(
     /** Repaint every tab header so the selected one is highlighted and the rest are flat. */
     private fun updateTabSelection() {
         for (i in sessions.indices) {
-            sessions[i].tabComp.background =
-                if (i == selectedIndex) UIUtil.getListBackground(true) else UIUtil.getPanelBackground()
+            val tab = sessions[i].tabComp
+            // Drive the highlight through [TabHeader.selected] (painted every repaint) rather than a one-shot
+            // `background` assignment, so it survives a tool-window hide/show or LaF refresh that would
+            // otherwise reset the background to the panel colour.
+            if (tab is TabHeader) {
+                tab.selected = (i == selectedIndex)
+                tab.background = tab.backgroundForState
+            }
+            tab.repaint()
         }
         activeWidget()?.forceReinitFull()
     }
@@ -635,6 +642,26 @@ private class YoloPanel(
     private fun selectByWidget(widget: YoloJediTermWidget) {
         val i = sessions.indexOfFirst { it.widget == widget }
         if (i >= 0) selectTab(i)
+    }
+
+    /**
+     * One entry of the hand-built tab strip. Unlike a Swing JTabbedPane tab, this component paints its own
+     * background, and it derives the *selected* highlight from [selected] on **every** paint — not once at
+     * selection time. That keeps the highlight correct across LaF refreshes and tool-window show/hide, which
+     * otherwise re-install the component UI and reset an imperatively-set `background` to the panel colour,
+     * leaving the selected tab looking unselected until the next selection change.
+     */
+    private class TabHeader : JBPanel<TabHeader>() {
+        var selected = false
+        /** Selection-aware background: list-selection colour when selected, otherwise the panel colour. */
+        val backgroundForState: Color
+            get() = if (selected) UIUtil.getListBackground(true) else UIUtil.getPanelBackground()
+        override fun paintComponent(g: Graphics?) {
+            super.paintComponent(g)
+            g ?: return
+            g.color = backgroundForState
+            g.fillRect(0, 0, width, height)
+        }
     }
 
     /** Build one entry of the tab strip: agent icon + name + a close (✕) button that tears down that session. */
@@ -658,7 +685,7 @@ private class YoloPanel(
                 if (i >= 0 && confirmCloseTab()) closeSession(i)
             }
         }
-        val tab = JPanel(BorderLayout(JBUI.scale(8), 0)).apply {
+        val tab = TabHeader().apply {
             // Paint an explicit, theme-aware background — unlike a Swing JTabbedPane tab component, this
             // strip is our own component and is always painted, so the title and close button stay visible.
             isOpaque = true
