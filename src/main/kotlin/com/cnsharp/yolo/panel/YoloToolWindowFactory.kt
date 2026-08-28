@@ -675,6 +675,11 @@ private class YoloPanel(
             isBorderPainted = false
             isContentAreaFilled = false
             isFocusable = false
+            // Drop the default JButton margin so the ✕ glyph sits flush to the tab's right edge
+            // instead of leaving a few px of internal padding on its right.
+            margin = JBUI.emptyInsets()
+            // Right-align the glyph within the button so it hugs the tab's right edge (border inset 0).
+            horizontalAlignment = SwingConstants.RIGHT
             foreground = UIUtil.getLabelForeground()
             toolTipText = message("panel.closeTab")
             font = JBUI.Fonts.smallFont()
@@ -690,9 +695,12 @@ private class YoloPanel(
             // strip is our own component and is always painted, so the title and close button stay visible.
             isOpaque = true
             background = UIUtil.getPanelBackground()
+            // Explicit BorderLayout: the constraints below (WEST/EAST) are otherwise ignored and JBPanel's
+            // default FlowLayout would center and wrap the close (✕) to a second line for long names.
+            layout = BorderLayout(0, 0)
             // Padding doubles as the gap between adjacent tabs (BoxLayout adds none of its own).
-            // Right inset is kept small so the close (✕) sits right at the tab edge.
-            border = JBUI.Borders.empty(2, JBUI.scale(4), 2, JBUI.scale(2))
+            // Right inset is 0 so the flush ✕ (margin removed above) hugs the tab's right edge.
+            border = JBUI.Borders.empty(2, JBUI.scale(4), 2, 0)
             // Name pinned to the left, close (✕) pinned to the right edge of the tab so it stays
             // right-aligned regardless of how long the agent name is.
             add(nameLabel, BorderLayout.WEST)
