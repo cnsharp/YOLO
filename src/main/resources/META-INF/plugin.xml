@@ -38,6 +38,20 @@
                       bundle="messages.YoloBundle"
                       id="com.cnsharp.yolo.exp.configurable"/>
         <notificationGroup id="com.cnsharp.yolo.exp.notifications" displayType="BALLOON"/>
+        <!-- Contribute terminal hyperlinks to the reworked (block) terminal. Unlike the terminal EPs
+             below, this is a stable public platform EP (the terminal registers its own provider here too). -->
+        <!-- order="first": run BEFORE the terminal's own TerminalGenericFileFilterProvider, which is
+             registered with no order and also matches file paths. Filter.Result defaults to
+             NextAction.EXIT and CompositeFilter stops at the first result carrying it, so if that
+             provider is asked first our filters never see the line at all — file paths then render with
+             the platform's own (partial) match and FileLinkFilter never records the wrap prefix needed
+             to reconstruct a hard-wrapped path. Our results are CONTINUE_FILTERING, so the terminal's
+             provider still runs afterwards. -->
+        <consoleFilterProvider implementation="com.cnsharp.yolo.exp.links.ExpLinkFilterProvider"
+                               order="first"/>
+        <!-- Warm the project-type snapshot in the background so the first streamed line is already
+             filtered against real project types instead of an empty snapshot. -->
+        <backgroundPostStartupActivity implementation="com.cnsharp.yolo.exp.links.ExpLinkWarmUpActivity"/>
     </extensions>
 
     <!-- Extension points used by the terminal AI Agents dropdown (all from org.jetbrains.plugins.terminal).

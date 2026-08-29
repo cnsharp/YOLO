@@ -1,4 +1,4 @@
-package com.cnsharp.yolo.settings
+package com.cnsharp.yolo.exp.settings
 
 import org.junit.Assert.*
 import org.junit.Test

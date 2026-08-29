@@ -83,6 +83,21 @@ kotlin {
     jvmToolchain(25)
 }
 
+// Unit tests run against the SAME local IDEA platform used for compilation (`intellijPlatformClasspath`),
+// which already resolves cleanly. We deliberately do NOT use the plugin's `testFramework(...)` helper:
+// on IDEA 2026.2 its `ModuleDescriptorsValueSource` fails to parse the new `namespace` attribute on the
+// platform's `<module>` descriptors (plugin 2.18.1 predates that schema), so the IntelliJ test classpath
+// cannot be assembled offline. Reusing the working main classpath keeps `:test` fully offline. JUnit 4 is
+// pulled once (cached) since release IDEA does not bundle it.
+dependencies {
+    testImplementation(files(configurations["intellijPlatformClasspath"]))
+    testImplementation("junit:junit:4.13.2")
+}
+
+tasks.withType<Test> {
+    useJUnit()
+}
+
 // Force a clean before packaging. This repo's `build/` is shared between the main `yolo` build and the
 // `yolo-exp` build (settings.gradle.kts names the project `yolo-exp`, and both variants compile into the
 // same `build/classes/kotlin/main`). Without a clean, a build of one variant repackages the other
