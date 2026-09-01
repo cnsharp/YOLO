@@ -218,11 +218,16 @@ private class YoloPanel(
         viewport.isOpaque = false
     }
 
-    /** Dropdown arrow to the right of the settings gear: lists every open terminal for quick switching. */
+    /**
+     * Dropdown arrow to the right of the settings gear: lists every open terminal for quick switching.
+     * Stays hidden until a *second* tab is open — with zero or one tab there is nothing to switch to,
+     * so the arrow would be a dead control.
+     */
     private val tabDropdownBtn = JButton(AllIcons.General.ChevronDown).apply {
         isBorderPainted = false
         isContentAreaFilled = false
         isFocusable = false
+        isVisible = false
         toolTipText = message("panel.tabDropdown")
         addActionListener { showTabDropdown() }
     }
@@ -620,6 +625,7 @@ private class YoloPanel(
         selectedIndex = sessions.lastIndex
         cardLayout.show(contentArea, cardKey)
         updateTabSelection()
+        updateTabDropdownVisibility()
 
         // JediTerm's own TerminalPanel handles ongoing resizes itself: its built-in `componentResized`
         // listener recomputes the grid (sizeTerminalFromComponent) without re-deriving the font — so text
@@ -648,6 +654,21 @@ private class YoloPanel(
             tab.repaint()
         }
         activeWidget()?.forceReinitFull()
+    }
+
+    /**
+     * Show the "Switch terminal" arrow only while **more than one** terminal tab is open. With a single
+     * tab there is nothing to switch to (the menu would list just the tab you are already on), so the
+     * arrow would be a dead control next to the placeholder. See [showTabDropdown], which bails out
+     * unless it has at least two tabs to choose between.
+     */
+    private fun updateTabDropdownVisibility() {
+        val shouldShow = sessions.size > 1
+        if (tabDropdownBtn.isVisible == shouldShow) return
+        tabDropdownBtn.isVisible = shouldShow
+        // Relayout the button's parent so the header reflows instead of leaving a gap.
+        tabDropdownBtn.parent?.revalidate()
+        tabDropdownBtn.parent?.repaint()
     }
 
     /** Select the session at [index] (switch the visible card + highlight its header). */
@@ -763,6 +784,7 @@ private class YoloPanel(
             cardLayout.show(contentArea, sessions[selectedIndex].cardKey)
         }
         updateTabSelection()
+        updateTabDropdownVisibility()
         tabBarScroll.revalidate()
         tabBarScroll.repaint()
     }
@@ -784,7 +806,8 @@ private class YoloPanel(
      * is not on this plugin's compile classpath.
      */
     private fun showTabDropdown() {
-        if (sessions.isEmpty()) return
+        // A single tab is the one already on screen, so there is nothing to switch to.
+        if (sessions.size <= 1) return
         val menu = JPopupMenu()
         sessions.forEachIndexed { i, s ->
             val item = JMenuItem(s.row.displayName).apply {
