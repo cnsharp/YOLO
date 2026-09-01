@@ -64,6 +64,14 @@
     "icon": "/icons/agents/gemini.png"
   },
   {
+    "id": "aider",
+    "displayName": "Aider",
+    "command": "aider",
+    "skipFlag": "--yes",
+    "resumeFlag": "",
+    "icon": "/icons/agents/aider.png"
+  },
+  {
     "id": "goose",
     "displayName": "Goose",
     "command": "goose",

@@ -120,6 +120,13 @@ class AgentExtenderConfigurable : Configurable {
         // duplicate checks also run immediately so the user sees conflicts while editing, not only at Apply time.
         installListeners()
 
+        // Keep the Providers button's enabled state in sync with the selected agent (only proxy-able + installed).
+        toolsTable.selectionModel.addListSelectionListener { e ->
+            if (e.valueIsAdjusting) return@addListSelectionListener
+            updateProvidersButtonState()
+        }
+        updateProvidersButtonState()
+
         val titleWithHelp = JPanel(HorizontalLayout(4)).apply {
             add(JBLabel(message("settings.agents.label")))
             add(ContextHelpLabel.create(message("settings.agents.help")))
@@ -129,6 +136,7 @@ class AgentExtenderConfigurable : Configurable {
             add(addToolButton())
             add(removeToolButton())
             add(validateButton())
+            add(providersButton())
         }
 
         panel = FormBuilder.createFormBuilder()
@@ -185,6 +193,44 @@ class AgentExtenderConfigurable : Configurable {
             setStatus(message("status.removed"), warn = false)
         }
         return button
+    }
+
+    /** "Providers…" opens the per-agent LLM provider dialog (2.0). Enabled only for an agent that is both
+     *  installed and proxy-able (reads a custom LLM backend via env). See LlmProviderSupport. */
+    private lateinit var providersButton: JButton
+    private fun providersButton(): JComponent {
+        val button = JButton("Providers…")
+        button.toolTipText = "为所选 agent 配置自定义 LLM Provider"
+        button.addActionListener {
+            val row = toolsTable.selectedRow
+            if (row < 0) {
+                setStatus(message("status.selectRow"), warn = true)
+                return@addActionListener
+            }
+            val id = (toolsModel.getValueAt(row, COL_ID) as? String)?.trim() ?: ""
+            val command = (toolsModel.getValueAt(row, COL_COMMAND) as? String)?.trim() ?: ""
+            val display = (toolsModel.getValueAt(row, COL_DISPLAY) as? String)?.trim() ?: id
+            ProviderDialog(id, display, command).show()
+        }
+        providersButton = button
+        return button
+    }
+
+    /** Reflect the selected agent's proxy-able/installed status into the Providers button's enabled state. */
+    private fun updateProvidersButtonState() {
+        val row = toolsTable.selectedRow
+        val enabled = if (row < 0) false else {
+            val command = (toolsModel.getValueAt(row, COL_COMMAND) as? String)?.trim() ?: ""
+            LlmProviderSupport.isProviderConfigurable(
+                command, AgentExtenderSettings.getInstance().state.installedCommands
+            )
+        }
+        providersButton.isEnabled = enabled
+        providersButton.toolTipText = if (enabled) {
+            "为所选 agent 配置自定义 LLM Provider"
+        } else {
+            "该 agent 未安装或不支持自定义 LLM"
+        }
     }
 
     private fun iconChooserButton(): JComponent {
