@@ -35,8 +35,8 @@ A **YOLO (Skip Permissions)** toggle in the panel header. Turn it on and the nex
 permission-bypass flag appended — `--dangerously-skip-permissions` for Claude Code, `--yolo` for Codex, `-y` for
 CodeBuddy, and so on.
 
-The flag is **per agent** and fully configurable. The plugin knows the correct flag for 16 common agents and
-pre-fills it, but every value is editable and nothing is hardcoded at runtime. A few agents (Goose) bypass via an
+The flag is **per agent** and fully configurable. The plugin pre-fills the correct flag for known agents,
+but every value is editable and nothing is hardcoded at runtime. A few agents (Goose) bypass via an
 environment variable instead of a flag; those are handled too.
 
 **The toggle is off by default and never turns itself on.**
