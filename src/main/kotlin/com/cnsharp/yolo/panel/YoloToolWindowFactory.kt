@@ -550,8 +550,27 @@ private class YoloPanel(
                     .setEnvironment(env)
                     .setRedirectErrorStream(true)
                     .start()
+                // Tracks what the user types so links are never painted inside the agent's input box.
+                // Declared here because the tty connector below feeds it and the filters (added later,
+                // once the widget exists) read it.
+                val typedInput = TypedInputGuard()
                 val connector = object : ProcessTtyConnector(process, StandardCharsets.UTF_8) {
                     override fun getName(): String = YoloConstants.ID
+
+                    /**
+                     * Everything the user types reaches the agent through here — the one place where our
+                     * input can be told apart from the agent's output. A PTY returns one undifferentiated
+                     * stream, so the echo of a keystroke is indistinguishable from agent output by the
+                     * time it is painted; recording it here lets [TypedInputGuard] keep the text being
+                     * typed free of hyperlinks (see [InputAwareLinkFilter]).
+                     *
+                     * [ProcessTtyConnector.write] (the String overload) delegates to this method, so
+                     * overriding only this one records each keystroke exactly once.
+                     */
+                    override fun write(bytes: ByteArray) {
+                        typedInput.onUserInput(String(bytes, StandardCharsets.UTF_8))
+                        super.write(bytes)
+                    }
 
                     /**
                      * Push the terminal size to the PTY so the child process (and any interactive TUI it
@@ -575,15 +594,17 @@ private class YoloPanel(
                         // paths that the terminal split across physical lines, and suppress duplicate links.
                         val wrapState = PathWrapState()
                         // File references (path[:line[:col]], ranges, ~/, file://, quoted paths with spaces).
-                        widget.addHyperlinkFilter(FileLinkFilter(project, dir, wrapState))
+                        widget.addHyperlinkFilter(InputAwareLinkFilter(FileLinkFilter(project, dir, wrapState), typedInput))
                         // Stack-trace frames / tracebacks where only the file name is printed (Bar.java:123, File "x", line N).
-                        widget.addHyperlinkFilter(StackTraceLinkFilter(project, dir, wrapState))
+                        widget.addHyperlinkFilter(
+                            InputAwareLinkFilter(StackTraceLinkFilter(project, dir, wrapState), typedInput)
+                        )
                         // Type references (qualified names and project simple names) → class declaration.
-                        widget.addHyperlinkFilter(TypeLinkFilter(project))
+                        widget.addHyperlinkFilter(InputAwareLinkFilter(TypeLinkFilter(project), typedInput))
                         // Class.member / Class#member → the specific method/field/inner class.
-                        widget.addHyperlinkFilter(MemberLinkFilter(project))
+                        widget.addHyperlinkFilter(InputAwareLinkFilter(MemberLinkFilter(project), typedInput))
                         // http(s):// URLs → system browser (does not hide the pane).
-                        widget.addHyperlinkFilter(UrlLinkFilter())
+                        widget.addHyperlinkFilter(InputAwareLinkFilter(UrlLinkFilter(), typedInput))
                         widget.setTtyConnector(connector)
                         // Warm the project-type cache off the terminal thread so the first streamed line
                         // doesn't stall while the snapshot is built.

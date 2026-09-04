@@ -100,6 +100,8 @@ right place and **auto-hides the YOLO panel** so it no longer covers the editor.
 
 - **Line/column navigation** works for paths, stack frames, and member references.
 - **No-extension files** (`Makefile`, `Dockerfile`) and **Windows paths** are handled.
+- **What you type is never linked.** Links are painted on the agent's *output* only — the text you are
+  typing into the agent's own input box stays plain, so it can't turn into a link under your cursor.
 - URLs are the exception: clicking one opens your browser but keeps the panel open.
 
 > ### Warning — about YOLO mode

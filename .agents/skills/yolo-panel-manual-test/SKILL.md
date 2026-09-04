@@ -28,6 +28,7 @@ Use this skill to verify the YOLO: AI Agents Extender panel in a real IDE. It is
 - Selecting a dropdown entry launches the agent in a real in-panel PTY terminal (JediTerm + PTY4J), not the IDEA Terminal API; its TUI renders.
 - Ctrl+C passes through to the embedded terminal instead of opening IDEA's "Shortcuts conflicts" dialog.
 - Terminal output becomes clickable and navigates; clicking hides the panel — except URLs, which open the browser and keep the panel open.
+- Text **typed into the agent's own input box** never becomes a link (paste a path like `src/main/kotlin/com/cnsharp/yolo/panel/YoloToolWindowFactory.kt:100` into the prompt and confirm it stays plain); the same text becomes linked only after submit, once the agent has echoed it as output.
 - Settings (gear): agent table, pre-filled skip flags, duplicate ID/command rejection (status line turns red, Apply refuses), Validate runs the command once and downloads its icon.
 
 ## Sample inputs
