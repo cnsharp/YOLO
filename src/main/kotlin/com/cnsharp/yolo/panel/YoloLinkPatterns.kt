@@ -28,7 +28,7 @@ internal val PROGRAMMING_EXT: String = buildList {
     // JVM / static languages
     addAll(listOf("kt", "kts", "java", "scala", "sc", "groovy", "gradle"))
     // Dynamic / scripting
-    addAll(listOf("py", "pyi", "pyw", "rb", "rake", "php", "pl", "pm", "lua", "sh", "bash", "zsh", "ksh"))
+    addAll(listOf("py", "pyi", "pyw", "rb", "rake", "php", "pl", "pm", "lua", "sh", "bash", "zsh", "ksh", "bat", "cmd", "ps1", "psm1", "psd1"))
     // Web / front-end
     addAll(listOf("js", "jsx", "mjs", "cjs", "ts", "tsx", "vue", "html", "htm", "xhtml", "css", "scss", "sass", "less", "styl"))
     // Systems / native
@@ -102,10 +102,14 @@ internal val STACK_BARE_PATTERN: Pattern = Pattern.compile(
  * linked, and a trailing boundary is required so it does not grab the start of a longer path or a
  * `name:line` reference.
  *
+ * The optional leading dot lets dotfiles link, e.g. `.gitignore`, `.editorconfig`, `.env` (their name
+ * after the dot is in [PROGRAMMING_EXT]); without it a `[\w.\-]+\.ext` cannot match because there is no
+ * character before the final dot. A bare `gitignore` (no dot) still does not match.
+ *
  * **Groups:** 1 = file.
  */
 internal val STACK_BARE_NAME_PATTERN: Pattern = Pattern.compile(
-    """(?<![\\/\w.\-])([\w.\-]+\.(?i:$PROGRAMMING_EXT))(?![\\/\w.:])"""
+    """(?<![\\/\w.\-])(\.?(?:[\w.\-]+\.)?(?i:$PROGRAMMING_EXT))(?![\\/\w.:])"""
 )
 
 /** Python traceback `File "path", line N` (double-quoted). **Groups:** 1 = file, 2 = line. */
