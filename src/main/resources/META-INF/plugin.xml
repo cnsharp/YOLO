@@ -3,12 +3,12 @@
     <!-- <name> is injected at build time: build.gradle.kts reads and overwrites it from
          messages/YoloBundle.properties' plugin.name, so the product name is maintained only in
          that single key. This is just a placeholder. -->
-    <name>YOLO: AI Agents Extender</name>
+    <name>Agent YOLO</name>
     <!-- <version> is also injected at build time: from pluginVersion in gradle.properties. This is just a placeholder. -->
     <version>0.0.0</version>
     <vendor email="support@cnsharp.com" url="">CnSharp Studio</vendor>
     <description><![CDATA[
-<p><b>YOLO</b> is a standalone <b>AI Agents</b> panel for IntelliJ IDEA. It lists your AI CLIs (Claude Code, Codex, CodeBuddy, Qoder, or your own) and launches any of them in a <b>real, interactive terminal inside the IDE</b> with a single click — no Terminal plugin required. Everything the agent prints becomes <b>clickable</b>: jump from its output straight to the code.</p>
+<p><b>Agent YOLO</b> is a standalone <b>AI Agents</b> panel for IntelliJ IDEA. It lists your AI CLIs (Claude Code, Codex, CodeBuddy, Qoder, or your own) and launches any of them in a <b>real, interactive terminal inside the IDE</b> with a single click — no Terminal plugin required. Everything the agent prints becomes <b>clickable</b>: jump from its output straight to the code.</p>
 <ul>
   <li><b>YOLO panel</b> — A dedicated tool window (right side, <b>y</b> icon) that replicates the Terminal's AI Agents experience, built entirely on public IntelliJ APIs so it passes Marketplace verification. The agent list loads instantly from a cached install scan and refreshes in the background.</li>
   <li><b>YOLO mode</b> — A "Skip permissions" toggle in the panel. When on, the next agent launches with its skip-permissions flag (e.g. <code>--dangerously-skip-permissions</code>, <code>--yolo</code>, <code>-y</code>). Per-agent, fully configurable, and <b>off by default</b>.</li>
