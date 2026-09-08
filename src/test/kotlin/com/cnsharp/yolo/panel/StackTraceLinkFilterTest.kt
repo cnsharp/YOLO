@@ -103,7 +103,7 @@ class StackTraceLinkFilterTest {
     fun testWrapTailSuppressedWhenContinuationSpanSet() {
         // When FileLinkFilter has already linked a continuation tail, StackTraceLinkFilter must not
         // create a second (incorrect) bare-name link for the same span.
-        val state = PathWrapState()
+        val state = WrapState()
         state.continuationSpan = 8 until 30   // simulates FileLinkFilter linking "rTransitionContext.java"
         val filter = StackTraceLinkFilter(null, "/tmp", state)
         assertTrue(filter.apply("        rTransitionContext.java").let {

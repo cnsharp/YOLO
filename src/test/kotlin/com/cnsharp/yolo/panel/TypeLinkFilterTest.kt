@@ -22,7 +22,7 @@ class TypeLinkFilterTest {
     )
 
     private fun linked(text: String): List<String> {
-        val filter = TypeLinkFilter(null) { _ -> types }
+        val filter = TypeLinkFilter(null, { _ -> types })
         return filter.apply(text)
             ?.items
             ?.map { text.substring(it.startOffset, it.endOffset) }

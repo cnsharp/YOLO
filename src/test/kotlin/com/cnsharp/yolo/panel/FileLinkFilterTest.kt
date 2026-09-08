@@ -225,9 +225,9 @@ class FileLinkFilterTest {
     // ---- Hard-wrap path reconstruction ----
 
     private fun linkedWithState(line1: String, line2: String): List<String> {
-        val state = PathWrapState()
+        val state = WrapState()
         val filter = FileLinkFilter(null, "/tmp/agent-working-dir", state)
-        filter.apply(line1)       // processes head line, sets pendingPrefix
+        filter.apply(line1)       // processes head line, sets pendingPath
         return filter.apply(line2)
             ?.items
             ?.map { line2.substring(it.startOffset, it.endOffset) }
@@ -235,13 +235,42 @@ class FileLinkFilterTest {
     }
 
     @Test
+    fun testHardWrapHighlightsBothRowsAndCompletesHead() {
+        // A wrapped path must not be left half-painted: the head row is highlighted too. It alone is only a
+        // fragment, so it opens whatever the continuation completes it to — the full path plus :line.
+        val state = WrapState()
+        val filter = FileLinkFilter(null, "/tmp/agent-working-dir", state)
+        val head = "app/biz/service-impl/src/main/java/com/cnsharp/order/biz/service/statemachine/Orde"
+        val headLinked = filter.apply(head)
+            ?.items
+            ?.map { head.substring(it.startOffset, it.endOffset) }
+            .orEmpty()
+        assertEquals("the head row must be highlighted", listOf(head), headLinked)
+        val tail = "rTransitionContext.java:42"
+        val tailLinked = filter.apply(tail)
+            ?.items
+            ?.map { tail.substring(it.startOffset, it.endOffset) }
+            .orEmpty()
+        assertEquals("the continuation row must be highlighted", listOf(tail), tailLinked)
+        // The head link resolves the reconstructed reference — same file and line as the continuation.
+        assertEquals(
+            WrapState.CompletedPath(
+                "app/biz/service-impl/src/main/java/com/cnsharp/order/biz/service/statemachine/OrderTransitionContext.java",
+                42,
+                null
+            ),
+            state.completedPaths[head]
+        )
+    }
+
+    @Test
     fun testHardWrapHeadSetsPendingPrefix() {
-        val state = PathWrapState()
+        val state = WrapState()
         val filter = FileLinkFilter(null, "/tmp", state)
         filter.apply("app/biz/service-impl/src/main/java/com/cnsharp/order/biz/service/statemachine/Orde")
         assertEquals(
             "app/biz/service-impl/src/main/java/com/cnsharp/order/biz/service/statemachine/Orde",
-            state.pendingPrefix
+            state.pendingPath
         )
     }
 
@@ -269,13 +298,53 @@ class FileLinkFilterTest {
     }
 
     @Test
+    fun testHardWrapHeadEndingInSlashSetsPendingPrefix() {
+        // The terminal wrapped exactly at a path separator: the head line ends with '/'. The trailing
+        // separator must be preserved in the prefix so the reconstructed path keeps its delimiter.
+        val state = WrapState()
+        val filter = FileLinkFilter(null, "/tmp", state)
+        filter.apply("app/biz/service-impl/src/main/java/com/cnsharp/order/biz/service/")
+        assertEquals(
+            "app/biz/service-impl/src/main/java/com/cnsharp/order/biz/service/",
+            state.pendingPath
+        )
+    }
+
+    @Test
+    fun testHardWrapPathEndingInSlashReconstructed() {
+        // The reported bug: the head `…/biz/service/` wraps at a separator; the continuation
+        // `statemachine/config/StatusGrayScaleConfigBean.java` must be linked as ONE tail of the
+        // reconstructed path — not dropped, and without a duplicate link from the standalone pass.
+        val tail = "statemachine/config/StatusGrayScaleConfigBean.java"
+        val linked = linkedWithState(
+            "app/biz/service-impl/src/main/java/com/cnsharp/order/biz/service/",
+            tail
+        )
+        assertEquals(listOf(tail), linked)
+    }
+
+    @Test
+    fun testExtensionMidWrapDoesNotProducePhantomLink() {
+        // When the terminal wraps INSIDE the extension (e.g. "build.gradl" | "e"), the pending prefix
+        // must NOT be stored — its last segment contains a dot, indicating a partial extension — so
+        // the continuation line's single letter is never linked.
+        val state = WrapState()
+        val filter = FileLinkFilter(null, "/tmp", state)
+        filter.apply("some/path/build.gradl")
+        assertEquals("extension-split head must not set pendingPath", "", state.pendingPath)
+        // The continuation line must produce no link.
+        val result = filter.apply("e")
+        assertTrue(result == null || result.items.isEmpty())
+    }
+
+    @Test
     fun testBlankLineBreaksWrapSequence() {
         // An empty line between head and continuation clears the pending prefix.
-        val state = PathWrapState()
+        val state = WrapState()
         val filter = FileLinkFilter(null, "/tmp", state)
         filter.apply("src/main/java/com/example/OrderTrans")
-        filter.apply("")            // blank line — must clear pendingPrefix
-        assertEquals("", state.pendingPrefix)
+        filter.apply("")            // blank line — must clear pendingPath
+        assertEquals("", state.pendingPath)
         // Continuation line is now treated standalone, not as a reconstruction target.
         val result = filter.apply("actionContext.java")
         // Without a prefix the standalone "actionContext.java" has a directory component? No —
