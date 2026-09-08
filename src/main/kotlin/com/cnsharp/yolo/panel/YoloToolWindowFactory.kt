@@ -89,7 +89,10 @@ class YoloToolWindowFactory : ToolWindowFactory {
 
     override fun init(toolWindow: ToolWindow) {
         // Set the title as early as registration so the stripe never briefly shows the bare id "YOLO".
+        // `title` is the tool-window header; `stripeTitle` is the button on the side stripe. Without the
+        // latter the stripe button falls back to the `<toolWindow id="YOLO">` from plugin.xml.
         toolWindow.title = Yolo.NAME
+        toolWindow.stripeTitle = Yolo.NAME
     }
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
@@ -97,6 +100,9 @@ class YoloToolWindowFactory : ToolWindowFactory {
         // title from it so renaming never requires touching plugin.xml. Set here (post-registration, always
         // called) and in init (registration time, avoids any first-paint of the bare id).
         toolWindow.title = Yolo.NAME
+        // The side stripe button shows `stripeTitle`; without it the button falls back to the tool-window
+        // id ("YOLO" in plugin.xml) and the panel looks unbranded even though the header is correct.
+        toolWindow.stripeTitle = Yolo.NAME
         // Seed the panel's initial width AFTER the tool window is fully registered. Seeding from
         // `init()` crashes on 2026.2: ToolWindowManagerImpl.setToolWindowAnchor dereferences a null
         // internal descriptor during registration and throws "Cannot init toolwindow", which aborts
@@ -643,19 +649,21 @@ private class YoloPanel(
                 ApplicationManager.getApplication().invokeLater {
                     try {
                         val widget = YoloJediTermWidget(YoloTerminalSettings())
-                        // Hard-wrap state shared between the two path filters so they can reconstruct
-                        // paths that the terminal split across physical lines, and suppress duplicate links.
-                        val wrapState = PathWrapState()
+                        // Hard-wrap state shared by all reference filters so they can reconstruct references
+                        // the terminal split across physical lines, and suppress duplicate / false links.
+                        val wrapState = WrapState()
                         // File references (path[:line[:col]], ranges, ~/, file://, quoted paths with spaces).
                         widget.addHyperlinkFilter(InputAwareLinkFilter(FileLinkFilter(project, dir, wrapState), typedInput))
+                        // Class.member / Class#member → the specific method/field/inner class. Runs before the
+                        // stack-trace filter so a reconstructed continuation tail (via continuationSpan) suppresses
+                        // any stray bare-name match (e.g. a `.pl` extension) that would otherwise overlap it.
+                        widget.addHyperlinkFilter(InputAwareLinkFilter(MemberLinkFilter(project, wrapState), typedInput))
+                        // Type references (qualified names and project simple names) → class declaration.
+                        widget.addHyperlinkFilter(InputAwareLinkFilter(TypeLinkFilter(project, wrapState = wrapState), typedInput))
                         // Stack-trace frames / tracebacks where only the file name is printed (Bar.java:123, File "x", line N).
                         widget.addHyperlinkFilter(
                             InputAwareLinkFilter(StackTraceLinkFilter(project, dir, wrapState), typedInput)
                         )
-                        // Type references (qualified names and project simple names) → class declaration.
-                        widget.addHyperlinkFilter(InputAwareLinkFilter(TypeLinkFilter(project), typedInput))
-                        // Class.member / Class#member → the specific method/field/inner class.
-                        widget.addHyperlinkFilter(InputAwareLinkFilter(MemberLinkFilter(project), typedInput))
                         // http(s):// URLs → system browser (does not hide the pane).
                         widget.addHyperlinkFilter(InputAwareLinkFilter(UrlLinkFilter(), typedInput))
                         widget.setTtyConnector(connector)
