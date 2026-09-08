@@ -1,5 +1,6 @@
 package com.cnsharp.yolo.panel
 
+import com.cnsharp.yolo.Yolo
 import com.cnsharp.yolo.YoloBundle.message
 import com.cnsharp.yolo.launcher.SkipPermissionsAction
 import com.cnsharp.yolo.launcher.ResumeAction
@@ -86,7 +87,16 @@ class YoloToolWindowFactory : ToolWindowFactory {
         const val PANEL_MIN_WIDTH = 360
     }
 
+    override fun init(toolWindow: ToolWindow) {
+        // Set the title as early as registration so the stripe never briefly shows the bare id "YOLO".
+        toolWindow.title = Yolo.NAME
+    }
+
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
+        // The product name has one source of truth (plugin.name via Yolo.NAME); derive the tool-window
+        // title from it so renaming never requires touching plugin.xml. Set here (post-registration, always
+        // called) and in init (registration time, avoids any first-paint of the bare id).
+        toolWindow.title = Yolo.NAME
         // Seed the panel's initial width AFTER the tool window is fully registered. Seeding from
         // `init()` crashes on 2026.2: ToolWindowManagerImpl.setToolWindowAnchor dereferences a null
         // internal descriptor during registration and throws "Cannot init toolwindow", which aborts
