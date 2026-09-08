@@ -29,6 +29,7 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
+import com.intellij.openapi.ui.DoNotAskOption
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.wm.ToolWindow
@@ -476,13 +477,55 @@ private class YoloPanel(
         val row = agentCombo.selectedItem as? AgentRow ?: return
         // The default "AI Agents" prompt item has a blank command — never launch it.
         if (row.command.isBlank()) return
-        // Remember this agent so the panel re-selects it on next open.
-        AgentExtenderSettings.getInstance().state.lastAgentId = row.id
+        maybeWarnAndLaunch(row)
+    }
+
+    /**
+     * Launch gate for "Skip permissions" (YOLO mode): warn once before the agent runs with no confirmation.
+     * The agent can edit files / run commands unattended, so the user must opt in each launch — unless they
+     * have ticked "Don't show again" (persisted to [AgentExtenderSettings.State.skipWarningDismissed]), in
+     * which case the warning is suppressed.
+     */
+    private fun maybeWarnAndLaunch(row: AgentRow) {
+        val settings = AgentExtenderSettings.getInstance().state
+        val envPair = AgentRegistry.skipEnvFor(baseName(row.command))
+        // Only warn when the skip flag actually takes effect (matches the injection guard in [launch]).
+        val skipActive = settings.skipEnabled && (row.skipFlag.isNotBlank() || envPair != null)
+        if (!skipActive || settings.skipWarningDismissed) {
+            launch(row)
+            return
+        }
+
+        var doNotAskAgain = false
+        val doNotAsk = object : DoNotAskOption {
+            override fun isToBeShown(): Boolean = true
+            override fun setToBeShown(toBeShown: Boolean, exitCode: Int) {
+                // Checkbox checked ⇒ "don't show again" ⇒ toBeShown is false.
+                doNotAskAgain = !toBeShown
+            }
+            override fun canBeHidden(): Boolean = true
+            override fun shouldSaveOptionsOnCancel(): Boolean = false
+            override fun getDoNotShowMessage(): String = message("warning.skip.doNotShow")
+        }
+        val result = Messages.showOkCancelDialog(
+            project,
+            message("warning.skip.body"),
+            message("warning.skip.title"),
+            message("button.launchAnyway"),
+            Messages.getCancelButton(),
+            Messages.getWarningIcon(),
+            doNotAsk
+        )
+        // Cancel (or dialog closed) ⇒ abort the launch entirely.
+        if (result != Messages.OK) return
+        if (doNotAskAgain) settings.skipWarningDismissed = true
         launch(row)
     }
 
     /** Launch the selected agent into an interactive terminal embedded in the panel. */
     private fun launch(row: AgentRow) {
+        // Remember this agent so the panel re-selects it on next open (only once the launch is actually happening).
+        AgentExtenderSettings.getInstance().state.lastAgentId = row.id
         val settings = AgentExtenderSettings.getInstance().state
 
         val cmd = mutableListOf(row.command)

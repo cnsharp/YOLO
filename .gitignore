@@ -12,6 +12,8 @@ build/
 *.iml
 *.iml.bak
 out/
+# IDEA in-IDE compiler output (distinct from Gradle's build/)
+bin/
 
 # Local config
 local.properties
