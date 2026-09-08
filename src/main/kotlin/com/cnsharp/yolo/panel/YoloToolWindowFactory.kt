@@ -874,9 +874,13 @@ private class YoloPanel(
         if (sessions.size <= 1) return
         val menu = JPopupMenu()
         sessions.forEachIndexed { i, s ->
-            val item = JMenuItem(s.row.displayName).apply {
-                // The active tab is already shown, so mark it rather than offer a no-op switch.
+            // Same icon the tab strip shows for this agent, so the popup matches the tabs.
+            val icon = if (s.row.command.isBlank()) null else AgentIcons.forAgent(s.row.id, s.row.iconPath)
+            val item = JMenuItem(s.row.displayName, icon).apply {
+                // The active tab is already on screen, so disable it rather than offer a no-op switch — but
+                // keep its icon full-color via disabledIcon so a disabled item's icon isn't greyed out.
                 isEnabled = i != selectedIndex
+                disabledIcon = icon
                 addActionListener { selectTab(i) }
             }
             menu.add(item)
