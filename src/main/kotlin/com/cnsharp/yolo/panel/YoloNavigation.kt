@@ -93,23 +93,48 @@ internal fun openNavigationItem(item: NavigationItem) {
 /**
  * Best-effort member resolution: given a resolved class element and a member name, find the member symbol
  * (method / field / inner class) via the language-agnostic `gotoSymbolContributor` EP and return it as a
- * navigatable item. We prefer a candidate declared in the same file as the class (so an inherited member
- * from a library / base class is not mistaken for the project one), and return null if none matches — the
- * caller then navigates to the class declaration instead.
+ * navigatable item.
+ *
+ * A candidate is accepted when it is declared in the class's own file — the common case, where the member is
+ * part of the class itself — or when the class *inherits* it, i.e. the candidate's owning class is the
+ * resolved class or one of its superclasses / interfaces. The inheritance case matters for `…ServiceImpl`
+ * classes, whose methods are frequently declared only on an interface: requiring a same-file match made
+ * those references fall back to opening the class instead of the method.
+ *
+ * Returns null if no candidate matches — the caller then navigates to the class declaration instead.
  *
  * Must be called inside a read action.
  */
 internal fun resolveMember(project: Project, classItem: NavigationItem, member: String): NavigationItem? {
-    val classFile = (classItem as? PsiElement)?.containingFile?.virtualFile ?: return null
+    val psi = classItem as? PsiElement ?: return null
+    val classFile = psi.containingFile?.virtualFile
+    val classSimple = lastTypeNameSegment(classItem.name ?: "")
+    var inherited: NavigationItem? = null
     for (contributor in ChooseByNameContributor.SYMBOL_EP_NAME.extensionList) {
         val items = runCatching {
             contributor.getItemsByName(member, member, project, false)
         }.getOrNull() ?: continue
         for (item in items) {
-            // Prefer a symbol declared in the same file as the class (a project member, not an inherited one).
             val itemFile = (item as? PsiElement)?.containingFile?.virtualFile
+            // Best match: a symbol declared in the class's own file, i.e. part of the class itself.
             if (itemFile != null && itemFile == classFile) return item
+            // Otherwise keep a candidate whose declaring type is related to the class — the usual
+            // `XxxImpl` / `Xxx` (interface or base class) pair. Those members are inherited by the class,
+            // and without this the reference would fall back to opening the class instead of the method.
+            if (inherited == null && itemFile != null &&
+                isRelatedTypeName(classSimple, itemFile.nameWithoutExtension)
+            ) {
+                inherited = item
+            }
         }
     }
-    return null
+    return inherited
 }
+
+/**
+ * True when the two type (file) names look like a class and the interface / base class it implements — one
+ * name starts with the other (`LoanOrderServiceImpl` vs `LoanOrderService`). Used only as a fallback when no
+ * same-file member matched, so it can never override an exact hit.
+ */
+private fun isRelatedTypeName(a: String, b: String): Boolean =
+    a.isNotEmpty() && b.isNotEmpty() && (a.startsWith(b) || b.startsWith(a))
