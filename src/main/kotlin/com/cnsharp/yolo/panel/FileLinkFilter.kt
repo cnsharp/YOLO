@@ -34,13 +34,13 @@ import java.io.File
 class FileLinkFilter(
     private val project: Project?,
     private val baseDir: String,
-    private val wrapState: PathWrapState? = null
+    private val wrapState: WrapState? = null
 ) : HyperlinkFilter {
 
     override fun apply(text: String): LinkResult? {
         if (text.isBlank() || isDiffLine(text)) {
             // A blank or diff line breaks any pending wrap sequence.
-            wrapState?.pendingPrefix = ""
+            wrapState?.pendingPath = ""
             wrapState?.continuationSpan = null
             return null
         }
@@ -49,12 +49,12 @@ class FileLinkFilter(
         // --- Hard-wrap path reconstruction ---
         // JediTerm calls apply() per physical line. When a long path wraps at terminal width, the
         // head line ends with a path fragment (no extension, no :line) and we store it in
-        // wrapState.pendingPrefix. On the very next call (the continuation line) we prepend that
+        // wrapState.pendingPath. On the very next call (the continuation line) we prepend that
         // prefix, re-match PATH_PATTERN on the joined text, and create a link for the tail portion
         // inside the current line. The link resolves the FULL reconstructed path so navigation is
         // correct even though only the tail is visible and clickable.
-        val prefix = wrapState?.pendingPrefix ?: ""
-        wrapState?.pendingPrefix = ""
+        val prefix = wrapState?.pendingPath ?: ""
+        wrapState?.pendingPath = ""
         wrapState?.continuationSpan = null
 
         if (prefix.isNotEmpty()) {
@@ -72,13 +72,16 @@ class FileLinkFilter(
                 val hasLineC = cm.group(3) != null
                 if (!hasExtC && !hasLineC) {
                     // Still no ext/line — path wraps again; store new prefix for next line.
-                    if (combined.substring(matchEnd).isBlank()) wrapState?.pendingPrefix = rawC
+                    if (combined.substring(matchEnd).isBlank()) wrapState?.pendingPath = rawC
                     continue
                 }
                 if (rawC.contains('…') || rawC.contains("...") || isTruncatedPath(combined, cm.end(1))) continue
                 val lineNum = cm.group(3)?.toIntOrNull()
                 val col = cm.group(5)?.toIntOrNull()
                 val fullPath = fileLinkTarget(rawC, cm.group(2))
+                // Remember what the head fragment turned out to be, so the head row's link (created on the
+                // previous line, before this reconstruction) opens the same complete file reference.
+                wrapState?.completedPaths?.set(prefix, WrapState.CompletedPath(fullPath, lineNum, col))
                 val link = yoloHyperlink(project) {
                     val file = resolve(fullPath) ?: return@yoloHyperlink
                     val p = project ?: return@yoloHyperlink
@@ -127,6 +130,11 @@ class FileLinkFilter(
         while (m.find()) {
             // Skip a match that lies inside a quoted path (see quotedSpans above).
             if (quotedSpans.any { m.start(1) < it.second && m.end() > it.first }) continue
+            // Skip a match that overlaps the reconstructed continuation tail (see the hard-wrap block
+            // above): the continuation line's own complete path was already linked there, so linking it
+            // again here would paint a duplicate (and now-overlapping) link on the same text.
+            val cont = wrapState?.continuationSpan
+            if (cont != null && m.start(1) < cont.last && m.end() > cont.first) continue
             // Skip the tail of a truncated path: a `…`/`...` immediately before the path start (e.g.
             // `Read(src/main/kotlin/com/cnshar…/real/Bar.kt)`). The agent only abbreviated the middle, so
             // the fragment after the marker is not a real file.
@@ -138,10 +146,41 @@ class FileLinkFilter(
             // or — more importantly — fragments of a long path the terminal hard-wrapped across lines, which
             // would otherwise be painted as broken links (see PATH_PATTERN's completion requirement).
             if (!hasExt && !hasLine) {
-            // Hard-wrap head detection: if this no-ext/no-line path reaches the end of the line
-            // content, store it so the next physical line can attempt reconstruction.
-            if (wrapState != null && text.substring(m.end()).isBlank()) {
-                wrapState.pendingPrefix = raw
+            // Hard-wrap head detection: if this path fragment reaches the end of the line, store it so
+            // the next physical line can attempt reconstruction.
+            // A trailing path separator (the terminal wrapped exactly at a '/') is treated as end-of-line
+            // and preserved in the prefix, so the reconstructed path keeps its delimiter. Without this,
+            // `…/biz/service/` + `statemachine/Config.java` is dropped because the match ends before the
+            // slash and the remainder ("/") is not blank.
+            // Guard: only store when the last path segment has NO dot. A dot in the last segment means
+            // the wrap split inside the extension (e.g. "build.gradl" for ".gradle") and the continuation
+            // line would carry only the remaining extension chars — creating a 1–2 character phantom link
+            // (e.g. just "e"). Without a dot the fragment ends mid-name (e.g. "OrderTransitionContext"
+            // before ".java"), which is the correct wrap case.
+            if (wrapState != null) {
+                val rest = text.substring(m.end())
+                val reachesEnd = rest.isBlank() || rest.all { it == '/' || it == '\\' }
+                if (reachesEnd) {
+                    // Capture from the path start to end-of-line (minus trailing whitespace) so any
+                    // trailing separator survives into the prefix for correct reconstruction.
+                    val headRaw = text.substring(m.start(1)).trimEnd()
+                    val lastSep = headRaw.lastIndexOfAny(charArrayOf('/', '\\'))
+                    val lastSegment = if (lastSep >= 0) headRaw.substring(lastSep + 1) else headRaw
+                    if (!lastSegment.contains('.')) {
+                        wrapState.pendingPath = headRaw
+                        // Highlight the head row too, so a wrapped path is not left half-painted. The
+                        // fragment alone is not a real path yet, so the link opens whatever the next line
+                        // completes it to (recorded below); if nothing completes it, [resolve] finds no
+                        // file and the click simply does nothing.
+                        val link = yoloHyperlink(project) {
+                            val completed = wrapState.completedPaths[headRaw]
+                            val file = resolve(completed?.path ?: headRaw) ?: return@yoloHyperlink
+                            val p = project ?: return@yoloHyperlink
+                            openFileAt(p, file, completed?.line, completed?.column)
+                        }
+                        items.add(LinkResultItem(m.start(1), m.start(1) + headRaw.length, link))
+                    }
+                }
             }
             continue
         }

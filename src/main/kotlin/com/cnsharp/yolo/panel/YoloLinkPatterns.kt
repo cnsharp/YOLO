@@ -127,7 +127,10 @@ internal val STACK_PY_SQ_PATTERN: Pattern = Pattern.compile(
  * Rust/Ruby `foo::Bar`, PHP `\App\Models\User`, Python/Go `myapp.models.User` / `http.Client`) or a simple
  * capitalized identifier (`Bar`). Neither may be preceded by a word char/dot/path separator; a trailing
  * `.lowercase` is excluded so a member access (`Class.member`) is left for [com.cnsharp.yolo.panel.MemberLinkFilter]
- * rather than swallowed here. Drives [com.cnsharp.yolo.panel.TypeLinkFilter].
+ * rather than swallowed here. The pattern also refuses to match when immediately followed by a member
+ * separator + identifier (`Class#member` / `Class.Member`, `.` excluded only when lowercase), so the
+ * whole reference is left for [com.cnsharp.yolo.panel.MemberLinkFilter] to resolve to the member. Drives
+ * [com.cnsharp.yolo.panel.TypeLinkFilter].
  *
  * Qualified segments are joined by `.`, `::`, or `\` — the namespace separators used across languages — so
  * one pattern covers them all; actual resolution/gating is delegated to [com.cnsharp.yolo.panel.YoloProjectTypes]
@@ -141,8 +144,8 @@ internal val STACK_PY_SQ_PATTERN: Pattern = Pattern.compile(
  * **Named groups:** `qualified`, `simple` (mutually exclusive — exactly one is non-null per match).
  */
 internal val TYPE_NAME_PATTERN: Pattern = Pattern.compile(
-    """(?<![.\w/\\])(?<qualified>\\?(?:[A-Za-z_][A-Za-z0-9_]*+)(?:(?:\.|::|\\)[A-Za-z_][A-Za-z0-9_]*+)+)(?!\.[a-z])""" +
-        """|(?<![.\w/\\])(?<simple>(?![A-Z]+\b)[A-Z][a-zA-Z0-9_]*+)(?!\.[a-z])"""
+    """(?<![.\w/\\])(?<qualified>\\?(?:[A-Za-z_][A-Za-z0-9_]*+)(?:(?:\.|::|\\)[A-Za-z_][A-Za-z0-9_]*+)+)(?!\.[a-z])(?![#.][A-Za-z_]\w*)""" +
+        """|(?<![.\w/\\])(?<simple>(?![A-Z]+\b)[A-Z][a-zA-Z0-9_]*+)(?!\.[a-z])(?![#.][A-Za-z_]\w*)"""
 )
 
 /**
@@ -163,6 +166,27 @@ internal val MEMBER_REF_PATTERN: Pattern = Pattern.compile(
 
 /** `http(s)://` URLs (no trailing whitespace/quote/bracket). Drives [com.cnsharp.yolo.panel.UrlLinkFilter]. */
 internal val URL_PATTERN: Pattern = Pattern.compile("""https?://[^\s<>"'\)\]]+""")
+
+/**
+ * Trailing type-name fragment reaching end-of-line — a qualified name (`com.foo.Ba`) that the terminal
+ * hard-wrapped just before its final segment. Captured as group `qualified`. Used by
+ * [com.cnsharp.yolo.panel.TypeLinkFilter] to stitch the fragment to the next physical line
+ * (`com.foo.Ba` + `r` → `com.foo.Bar`). Only the qualified (separator-containing) form matches, so an
+ * ordinary capitalized word at end-of-line is never held as a pending prefix.
+ */
+internal val TYPE_HEAD_PATTERN: Pattern = Pattern.compile(
+    """(?<![.\w/\\])(?<qualified>\\?(?:[A-Za-z_][A-Za-z0-9_]*+)(?:(?:\.|::|\\)[A-Za-z_][A-Za-z0-9_]*+)+)\s*$"""
+)
+
+/**
+ * Trailing class-part fragment reaching end-of-line — a `Class` (qualified or capitalized simple) that the
+ * terminal hard-wrapped just before its `#member` / `.member`. Captured as group `class`. Used by
+ * [com.cnsharp.yolo.panel.MemberLinkFilter] to stitch the fragment to the next physical line
+ * (`Foo.impl.Ba` + `r#method` → `Foo.impl.Bar#method`).
+ */
+internal val MEMBER_HEAD_PATTERN: Pattern = Pattern.compile(
+    """(?<![.\w/\\])(?<class>(?:(?:\\?(?:[A-Za-z_][A-Za-z0-9_]*+)(?:(?:\.|::|\\)[A-Za-z_][A-Za-z0-9_]*+)+)|[A-Z][a-zA-Z0-9_]*+))\s*$"""
+)
 
 /**
  * True when the file reference at [fileStart] is the *tail* of a truncated path — i.e. the character(s)

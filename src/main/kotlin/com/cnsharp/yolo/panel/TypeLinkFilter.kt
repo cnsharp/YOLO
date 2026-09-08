@@ -29,6 +29,14 @@ class TypeLinkFilter(
     private val typesProvider: (Project?) -> YoloProjectTypes.Snapshot = { p ->
         if (p != null) YoloProjectTypes.snapshot(p) else YoloProjectTypes.Snapshot(emptySet(), emptySet())
     },
+    private val wrapState: WrapState? = null,
+    /**
+     * Test-only hook: when non-null, the type name a generated link targets is reported here synchronously
+     * (once per linked reference, at link-generation time). Lets offline tests assert the *reference* a
+     * reconstructed (hard-wrapped) type link would resolve, without a live project/index — PSI navigation
+     * itself stays deferred to click time and is exercised only in a real IDE. Production passes `null`.
+     */
+    private val onResolved: ((typeRef: String) -> Unit)? = null,
 ) : HyperlinkFilter {
 
     override fun apply(text: String): LinkResult? {
@@ -37,9 +45,56 @@ class TypeLinkFilter(
         // notations (e.g. the `Ctrl` in `Ctrl/C`) are not painted blue.
         val types = typesProvider(project)
         val items = mutableListOf<LinkResultItem>()
+        val projectRef = project
+
+        // --- Hard-wrap reconstruction: stitch a qualified name split across physical lines. ---
+        val prefix = wrapState?.pendingType ?: ""
+        wrapState?.pendingType = ""
+        if (prefix.isNotEmpty()) {
+            val trimmed = text.trimStart()
+            val leading = text.length - trimmed.length
+            val combined = prefix + trimmed
+            val cm = TYPE_NAME_PATTERN.matcher(combined)
+            var g = 0
+            while (cm.find() && g++ < MAX_MATCHES_PER_LINE) {
+                val mStart = cm.start()
+                val mEnd = cm.end()
+                // Only the match spanning the prefix/continuation boundary is a reconstruction.
+                if (mStart >= prefix.length || mEnd <= prefix.length) continue
+                val qualified = cm.group("qualified")
+                val simple = cm.group("simple")
+                val known = when {
+                    qualified != null -> lastTypeNameSegment(qualified) in types.simple
+                    simple != null -> types.containsSimple(simple)
+                    else -> false
+                }
+                if (!known) continue
+                val name = qualified ?: simple ?: continue
+                val tailStart = leading
+                val tailEnd = leading + (mEnd - prefix.length)
+                if (tailEnd > text.length) continue
+                // Report the resolved reference (test seam) synchronously — PSI navigation itself is deferred
+                // to click time, but the type this link targets is known here.
+                onResolved?.invoke(name)
+                val link = yoloHyperlink(projectRef) {
+                    if (projectRef != null) {
+                        val target = resolveType(projectRef, name)
+                        if (target != null) openNavigationItem(target)
+                    }
+                }
+                items.add(LinkResultItem(tailStart, tailEnd, link))
+                wrapState?.continuationSpan = tailStart until tailEnd
+            }
+        }
+        // --- End hard-wrap reconstruction ---
+
         val matcher = TYPE_NAME_PATTERN.matcher(text)
         var guard = 0
+        var linkedThisLine = false
+        val cont = wrapState?.continuationSpan
         while (matcher.find() && guard++ < MAX_MATCHES_PER_LINE) {
+            // Skip a match overlapping the reconstructed continuation tail (above) to avoid a duplicate span.
+            if (cont != null && matcher.start() < cont.last && matcher.end() > cont.first) continue
             val qualified = matcher.group("qualified")
             val simple = matcher.group("simple")
             val known = when {
@@ -50,6 +105,9 @@ class TypeLinkFilter(
                 else -> false
             }
             if (known) {
+                // Report the resolved reference (test seam) synchronously — PSI navigation itself is deferred to
+                // click time, but the type this link targets is known here.
+                onResolved?.invoke(qualified ?: simple ?: "")
                 // Resolution is deferred to click time so streaming output is never blocked by PSI index queries
                 // on the terminal emulator thread. The link navigates only if the name resolves to a real type
                 // in some language's contributor.
@@ -57,10 +115,18 @@ class TypeLinkFilter(
                     if (project != null) {
                         val name = qualified ?: simple
                         val target = if (name != null) resolveType(project, name) else null
-                        if (target != null) openNavigationItem(target)
+                        if (target != null) {
+                            // The terminal may have hard-wrapped right before this type's `#member`
+                            // (`…LoanOrderServiceImpl` + `#method`): the visible text here is only the class,
+                            // but the continuation completed the reference, so land on the member.
+                            val completed = name.let { wrapState?.completedMembers?.get(it) }
+                            val memberItem = completed?.let { resolveMember(project, target, it) }
+                            if (memberItem != null) openNavigationItem(memberItem) else openNavigationItem(target)
+                        }
                     }
                 }
                 items.add(LinkResultItem(matcher.start(), matcher.end(), link))
+                linkedThisLine = true
                 continue
             }
             // File-name fallback: a bare source-file base name that is not a class (e.g. a Kotlin file facade
@@ -73,6 +139,23 @@ class TypeLinkFilter(
                     }
                 }
                 items.add(LinkResultItem(matcher.start(), matcher.end(), link))
+                linkedThisLine = true
+            }
+        }
+
+        // Hard-wrap head detection: if a qualified name reaches end-of-line, remember it so the next physical
+        // line can reconstruct (e.g. `com.foo.Ba` + `r` → `com.foo.Bar`). Skip when this line already linked a
+        // complete type, and don't hold a known complete type as a pending prefix (it is not a wrap, and holding
+        // it would risk false links on the next line) unless it ends in a separator (clearly incomplete).
+        if (!linkedThisLine) {
+            val head = TYPE_HEAD_PATTERN.matcher(text)
+            if (head.find()) {
+                val headName = head.group("qualified")
+                if (headName != null && headName.isNotEmpty()) {
+                    val lastSeg = lastTypeNameSegment(headName)
+                    val endsWithSep = headName.endsWith('.') || headName.endsWith(':')
+                    if (endsWithSep || lastSeg !in types.simple) wrapState?.pendingType = headName
+                }
             }
         }
         return if (items.isEmpty()) null else LinkResult(items)

@@ -36,7 +36,7 @@ import java.util.regex.Pattern
 class StackTraceLinkFilter(
     private val project: Project?,
     private val baseDir: String,
-    private val wrapState: PathWrapState? = null
+    private val wrapState: WrapState? = null
 ) : HyperlinkFilter {
 
     override fun apply(text: String): LinkResult? {
