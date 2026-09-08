@@ -94,6 +94,12 @@ class AgentExtenderSettings : PersistentStateComponent<AgentExtenderSettings.Sta
         var skipEnabled: Boolean = false
         // Toolbar global "Resume session" checkbox state; off by default, only injects the agent's resumeFlag when checked.
         var resumeEnabled: Boolean = false
+        /**
+         * When true, the "Skip permissions" launch warning is suppressed. Set when the user ticks
+         * "Don't show this warning again" in the warning dialog (or the matching Settings checkbox), so the
+         * warning never pops up again.
+         */
+        var skipWarningDismissed: Boolean = false
         // Last agent launched in the YOLO panel (by agent id); restored as the dropdown's default selection on next open.
         var lastAgentId: String = ""
         // Each agent's skip flag value (from Settings); whether it is injected is controlled by skipEnabled.

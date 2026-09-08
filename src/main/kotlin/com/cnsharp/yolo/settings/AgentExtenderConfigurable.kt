@@ -15,6 +15,7 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.ui.ContextHelpLabel
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
+import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.components.panels.HorizontalLayout
@@ -93,6 +94,10 @@ class AgentExtenderConfigurable : Configurable {
     private fun isDark(c: Color): Boolean =
         (0.299 * c.red + 0.587 * c.green + 0.114 * c.blue) < 128
 
+    /** Settings checkbox mirroring [AgentExtenderSettings.State.skipWarningDismissed]: suppresses the
+     *  "Skip permissions" launch warning when ticked. */
+    private val skipWarnCheckBox = JBCheckBox(message("settings.skipWarning.label"))
+
     private var panel: JComponent? = null
 
     /** Whether there are unsaved changes: drives the platform Apply button's enabled/disabled state. */
@@ -145,6 +150,7 @@ class AgentExtenderConfigurable : Configurable {
             .addComponent(iconChooserButton())
             .addComponent(statusLabel)
             .addLabeledComponent(JBLabel(message("settings.linkColor.label")), linkColorButton)
+            .addComponent(skipWarnCheckBox)
             .panel
         reset()
         return panel!!
@@ -491,8 +497,12 @@ class AgentExtenderConfigurable : Configurable {
 
     // ── Persistence ──────────────────────────────────────────────────
 
-    override fun isModified(): Boolean =
-        modified || (linkColor.rgb and 0xFFFFFF) != AgentExtenderSettings.getInstance().state.linkColorRgb
+    override fun isModified(): Boolean {
+        val state = AgentExtenderSettings.getInstance().state
+        return modified
+            || (linkColor.rgb and 0xFFFFFF) != state.linkColorRgb
+            || skipWarnCheckBox.isSelected != state.skipWarningDismissed
+    }
 
     override fun apply() {
         // Duplicate ID/Command would create two same-named entries in the dropdown and skip rules would overwrite each other, so reject saving outright
@@ -528,6 +538,9 @@ class AgentExtenderConfigurable : Configurable {
 
         // ①b Terminal hyperlink color (alpha stripped so it round-trips with the persisted RGB int).
         settings.state.linkColorRgb = linkColor.rgb and 0xFFFFFF
+
+        // ①c Suppress the "Skip permissions" launch warning when the user ticks the checkbox.
+        settings.state.skipWarningDismissed = skipWarnCheckBox.isSelected
 
         // ② Custom tools: skip promoted agents (they are not written to customTools); only save user custom tools
         settings.state.customTools = (0 until toolsModel.rowCount).mapNotNull { r ->
@@ -644,6 +657,7 @@ class AgentExtenderConfigurable : Configurable {
             }
             refreshInstalledFlags()
             linkColor = Color(state.linkColorRgb)
+            skipWarnCheckBox.isSelected = state.skipWarningDismissed
             setStatus("", warn = false)
         } finally {
             rebuilding = false
