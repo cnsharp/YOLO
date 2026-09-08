@@ -46,8 +46,10 @@
                       bundle="messages.YoloBundle"
                       id="com.cnsharp.yolo.configurable"/>
         <notificationGroup id="com.cnsharp.yolo.notifications" displayType="BALLOON"/>
-        <!-- The standalone YOLO panel: a public tool window anchored on the right, using the plugin's y icon. -->
+        <!-- The standalone YOLO panel: a public tool window anchored on the right, using the plugin's y icon.
+             displayName is the user-visible panel title (Agent YOLO); id="YOLO" is the internal tool-window id and must not change. -->
         <toolWindow id="YOLO"
+                    displayName="Agent YOLO"
                     anchor="right"
                     icon="/icons/skipY.svg"
                     doNotActivateOnStart="true"
