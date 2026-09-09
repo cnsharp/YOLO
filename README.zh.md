@@ -247,13 +247,13 @@ localIdeaPath=/Applications/IntelliJ IDEA.app
 
 ```bash
 # macOS
-grep "AI Agents Extender" ~/Library/Logs/JetBrains/IntelliJIdea<version>/idea.log
+grep "Agent YOLO" ~/Library/Logs/JetBrains/IntelliJIdea<version>/idea.log
 
 # Linux
-grep "AI Agents Extender" ~/.cache/JetBrains/IntelliJIdea<version>/log/idea.log
+grep "Agent YOLO" ~/.cache/JetBrains/IntelliJIdea<version>/log/idea.log
 
 # Windows (PowerShell)
-grep "AI Agents Extender" "$env:LOCALAPPDATA\JetBrains\IntelliJIdea<version>\log\idea.log"
+grep "Agent YOLO" "$env:LOCALAPPDATA\JetBrains\IntelliJIdea<version>\log\idea.log"
 ```
 
 **某个智能体没有出现在面板中。** 它的命令在 `PATH` 上解析不到。面板只列出被检测为已安装的智能体;

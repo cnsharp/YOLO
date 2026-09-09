@@ -75,20 +75,20 @@ object AgentIcons {
 
         val file = File(path)
         if (!file.isFile) {
-            LOG.warn("AI Agents Extender: icon file does not exist, ignored: $path")
+            LOG.warn("Agent YOLO: icon file does not exist, ignored: $path")
             return null
         }
         return try {
             val raw = IconLoader.findIcon(file.toURI().toURL())
             if (raw == null) {
-                LOG.warn("AI Agents Extender: unrecognized icon format, ignored: $path")
+                LOG.warn("Agent YOLO: unrecognized icon format, ignored: $path")
                 return null
             }
             // User icons may not be 16x16; scale to standard size to avoid breaking the dropdown row height
             if (raw.iconWidth == SIZE && raw.iconHeight == SIZE) raw
             else IconUtil.resizeSquared(raw, SIZE)
         } catch (e: Exception) {
-            LOG.warn("AI Agents Extender: icon load failed, ignored: $path", e)
+            LOG.warn("Agent YOLO: icon load failed, ignored: $path", e)
             null
         }
     }
@@ -99,7 +99,7 @@ object AgentIcons {
             if (raw.iconWidth == SIZE && raw.iconHeight == SIZE) raw
             else IconUtil.resizeSquared(raw, SIZE)
         } catch (e: Exception) {
-            LOG.warn("AI Agents Extender: bundled icon load failed: $path", e)
+            LOG.warn("Agent YOLO: bundled icon load failed: $path", e)
             DEFAULT
         }
 }

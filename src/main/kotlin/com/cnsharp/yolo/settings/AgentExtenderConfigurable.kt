@@ -592,7 +592,7 @@ class AgentExtenderConfigurable : Configurable {
                     if (r.path.isNotEmpty() && r.path != icon) { tool.iconPath = r.path; changed = true }
                 is IconResolver.Result.Error ->
                     com.intellij.openapi.diagnostic.Logger.getInstance(AgentExtenderConfigurable::class.java)
-                        .warn("AI Agents Extender: icon resolve failed ${r.message}")
+                        .warn("Agent YOLO: icon resolve failed ${r.message}")
             }
         }
         if (changed) {

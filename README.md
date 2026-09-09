@@ -265,13 +265,13 @@ The plugin logs every launch it touches. To see what actually ran, grep the IDE 
 
 ```bash
 # macOS
-grep "AI Agents Extender" ~/Library/Logs/JetBrains/IntelliJIdea<version>/idea.log
+grep "Agent YOLO" ~/Library/Logs/JetBrains/IntelliJIdea<version>/idea.log
 
 # Linux
-grep "AI Agents Extender" ~/.cache/JetBrains/IntelliJIdea<version>/log/idea.log
+grep "Agent YOLO" ~/.cache/JetBrains/IntelliJIdea<version>/log/idea.log
 
 # Windows (PowerShell)
-grep "AI Agents Extender" "$env:LOCALAPPDATA\JetBrains\IntelliJIdea<version>\log\idea.log"
+grep "Agent YOLO" "$env:LOCALAPPDATA\JetBrains\IntelliJIdea<version>\log\idea.log"
 ```
 
 **An agent is missing from the panel.** Its command isn't resolving on `PATH`. The panel only lists
