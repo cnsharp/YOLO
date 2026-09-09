@@ -2,15 +2,6 @@ package com.cnsharp.yolo.panel
 
 import com.cnsharp.yolo.Yolo
 import com.cnsharp.yolo.YoloBundle.message
-import com.cnsharp.yolo.launcher.SkipPermissionsAction
-import com.cnsharp.yolo.launcher.ResumeAction
-import com.cnsharp.yolo.settings.AgentExtenderSettings
-import com.cnsharp.yolo.settings.AgentExtenderSettingsListener
-import com.cnsharp.yolo.settings.AgentRegistry
-import com.cnsharp.yolo.settings.InstalledAgents
-import com.cnsharp.yolo.settings.OpenSettingsAction
-import com.cnsharp.yolo.terminal.AgentIcons
-import com.cnsharp.yolo.util.baseName
 import com.cnsharp.yolo.YoloConstants
 import com.cnsharp.yolo.launcher.ResumeAction
 import com.cnsharp.yolo.launcher.SkipPermissionsAction
@@ -59,9 +50,7 @@ import java.awt.event.KeyEvent
 import java.beans.PropertyChangeListener
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
-import javax.swing.JButton
-import javax.swing.JPanel
-import javax.swing.SwingUtilities
+import javax.swing.*
 import kotlin.math.max
 import kotlin.math.min
 
@@ -367,19 +356,18 @@ private class YoloPanel(
                 add(launchBtn, BorderLayout.EAST)
             }
             add(selector, BorderLayout.CENTER)
-            add(toolbar.component, BorderLayout.EAST)
+            val right = JPanel(BorderLayout(JBUI.scale(2), 0)).apply {
+                add(toolbar.component, BorderLayout.CENTER)
+                add(tabDropdownBtn, BorderLayout.EAST)
+            }
+            add(right, BorderLayout.EAST)
         }
 
-        // Placeholder shown until the user picks an agent and clicks Launch.
-        terminalHolder.add(
-            JBLabel("Select an agent above, then click Launch to start its terminal").apply {
-                horizontalAlignment = javax.swing.SwingConstants.CENTER
-            },
-            BorderLayout.CENTER
-        )
+        // Start on the placeholder card; the first Launch adds a real terminal card.
+        cardLayout.show(contentArea, CARD_EMPTY)
 
         add(header, BorderLayout.NORTH)
-        add(terminalHolder, BorderLayout.CENTER)
+        add(terminalSplit, BorderLayout.CENTER)
 
         // Track OS display-scale changes so the embedded terminal can recompute (see scaleChangeListener).
         Toolkit.getDefaultToolkit().addPropertyChangeListener("awt.font.desktophints", scaleChangeListener)
