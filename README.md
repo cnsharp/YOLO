@@ -20,7 +20,7 @@ like any normal plugin. It does **not** hook into or depend on IDEA's built-in T
 A tool window (right side, **y** icon) that replicates the Terminal's **AI Agents** experience without touching
 any internal Terminal API:
 
-- Lists your **installed** agents — promoted agents (Claude Code, Codex, CodeBuddy, ZCode, …) plus your own custom tools.
+- Lists your **installed** agents — promoted agents (Claude Code, Codex, CodeBuddy, …) plus your own custom tools.
   Agents that aren't detected on `PATH` simply aren't shown, so the list stays relevant to this machine.
 - Each row shows the agent's icon, name, and its configured skip and resume flags.
 - The dropdown loads **instantly from a cached install scan** — the detection done on a previous run is reused, and a
@@ -28,8 +28,6 @@ any internal Terminal API:
 - The panel header holds two toggles — **YOLO (Skip Permissions)** and **Resume Session** — plus the settings gear, and a **Launch** button.
 
 ### YOLO mode
-
-![yolo-mode.png](screenshots/yolo-mode.png)
 
 A **YOLO (Skip Permissions)** toggle in the panel header. Turn it on and the next launch starts the agent with its
 permission-bypass flag appended — `--dangerously-skip-permissions` for Claude Code, `--yolo` for Codex, `-y` for
@@ -50,7 +48,7 @@ Codex / Cursor / TraeCode, `--taskId` for Cline — so the agent continues a pre
 The flag is **per agent** and fully configurable (see [Configuration](#configuration)). The plugin knows the correct
 resume flag for the common agents and pre-fills it, and custom tools set their own in the **Resume flag** column — a
 custom tool has no bundled `agents.json` entry, so that column is the only way to give it a resume flag. Agents without a
-CLI resume capability (e.g. Gemini / OpenCode / ZCode use a TUI `/resume` instead of a flag) launch unchanged when the
+CLI resume capability (e.g. Gemini / OpenCode  use a TUI `/resume` instead of a flag) launch unchanged when the
 toggle is on.
 
 **The toggle is off by default and never turns itself on.**
