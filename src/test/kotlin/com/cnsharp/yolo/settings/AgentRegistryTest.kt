@@ -11,7 +11,7 @@ class AgentRegistryTest {
         assertEquals("Claude Code", claude.displayName)
         assertEquals("claude", claude.command)
         assertEquals("--dangerously-skip-permissions", claude.skipFlag)
-        assertEquals("/icons/agents/claude.png", claude.icon)
+        assertEquals("/icons/agents/claude.svg", claude.icon)
         assertNull(claude.skipEnv)
     }
 
@@ -64,7 +64,7 @@ class AgentRegistryTest {
 
     @Test
     fun `iconFor returns classpath path for known agent`() {
-        assertEquals("/icons/agents/claude.png", AgentRegistry.iconFor("claude"))
+        assertEquals("/icons/agents/claude.svg", AgentRegistry.iconFor("claude"))
     }
 
     @Test

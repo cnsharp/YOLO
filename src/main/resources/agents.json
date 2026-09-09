@@ -5,7 +5,8 @@
     "command": "claude",
     "skipFlag": "--dangerously-skip-permissions",
     "resumeFlag": "-r",
-    "icon": "/icons/agents/claude.png"
+    "icon": "/icons/agents/claude.svg",
+    "url": "https://claude.ai/"
   },
   {
     "id": "codex",
@@ -13,39 +14,8 @@
     "command": "codex",
     "skipFlag": "--yolo",
     "resumeFlag": "--resume",
-    "icon": "/icons/agents/codex.svg"
-  },
-  {
-    "id": "cline",
-    "displayName": "Cline",
-    "command": "cline",
-    "skipFlag": "--auto-approve true",
-    "resumeFlag": "--taskId",
-    "icon": "/icons/agents/cline.png"
-  },
-  {
-    "id": "codebuddy",
-    "displayName": "CodeBuddy",
-    "command": "codebuddy",
-    "skipFlag": "-y",
-    "resumeFlag": "-r",
-    "icon": "/icons/agents/codebuddy.svg"
-  },
-  {
-    "id": "continue",
-    "displayName": "Continue",
-    "command": "cn",
-    "skipFlag": "--auto",
-    "resumeFlag": "",
-    "icon": "/icons/agents/continue.png"
-  },
-  {
-    "id": "copilot",
-    "displayName": "Copilot",
-    "command": "copilot",
-    "skipFlag": "--allow-all",
-    "resumeFlag": "-r",
-    "icon": "/icons/agents/copilot.svg"
+    "icon": "/icons/agents/codex.svg",
+    "url": "https://openai.com/codex"
   },
   {
     "id": "cursor",
@@ -53,64 +23,17 @@
     "command": "cursor-agent",
     "skipFlag": "--force",
     "resumeFlag": "--resume",
-    "icon": "/icons/agents/cursor.png"
+    "icon": "/icons/agents/cursor.svg",
+    "url": "https://cursor.com/"
   },
   {
-    "id": "gemini",
-    "displayName": "Gemini",
-    "command": "gemini",
-    "skipFlag": "--yolo",
-    "resumeFlag": "",
-    "icon": "/icons/agents/gemini.png"
-  },
-  {
-    "id": "aider",
-    "displayName": "Aider",
-    "command": "aider",
-    "skipFlag": "--yes",
-    "resumeFlag": "",
-    "icon": "/icons/agents/aider.png"
-  },
-  {
-    "id": "goose",
-    "displayName": "Goose",
-    "command": "goose",
-    "skipFlag": "",
+    "id": "copilot",
+    "displayName": "GitHub Copilot",
+    "command": "copilot",
+    "skipFlag": "--allow-all",
     "resumeFlag": "-r",
-    "skipEnv": { "name": "GOOSE_MODE", "value": "auto" },
-    "icon": "/icons/agents/goose.png"
-  },
-  {
-    "id": "hermes",
-    "displayName": "Hermes",
-    "command": "hermes",
-    "skipFlag": "--yolo",
-    "resumeFlag": "-r",
-    "icon": "/icons/agents/hermes.png"
-  },
-  {
-    "id": "kilo",
-    "displayName": "Kilo Code",
-    "command": "kilo",
-    "skipFlag": "",
-    "resumeFlag": "",
-    "icon": "/icons/agents/kilo.svg"
-  },
-  {
-    "id": "kimi",
-    "displayName": "Kimi",
-    "command": "kimi",
-    "skipFlag": "--yolo",
-    "resumeFlag": "-r",
-    "icon": "/icons/agents/kimi.png"
-  },
-  {
-    "id": "openclaw",
-    "displayName": "OpenClaw",
-    "command": "openclaw",
-    "skipFlag": "",
-    "resumeFlag": "",
-    "icon": "/icons/agents/openclaw.svg"
+    "icon": "/icons/agents/copilot.svg",
+    "url": "https://github.com/features/copilot"
   },
   {
     "id": "opencode",
@@ -118,23 +41,102 @@
     "command": "opencode",
     "skipFlag": "--auto",
     "resumeFlag": "",
-    "icon": "/icons/agents/opencode.png"
+    "icon": "/icons/agents/opencode.svg",
+    "url": "https://opencode.ai/"
   },
   {
-    "id": "pi",
-    "displayName": "Pi",
-    "command": "pi",
-    "skipFlag": "--approve",
-    "resumeFlag": "-r",
-    "icon": "/icons/agents/pi.svg"
-  },
-  {
-    "id": "qoder",
-    "displayName": "Qoder",
-    "command": "qoder",
-    "skipFlag": "--dangerously-skip-permissions",
+    "id": "aider",
+    "displayName": "Aider",
+    "command": "aider",
+    "skipFlag": "--yes",
     "resumeFlag": "",
-    "icon": "/icons/agents/qoder.svg"
+    "icon": "/icons/agents/aider.svg",
+    "url": "https://aider.chat/"
+  },
+  {
+    "id": "cline",
+    "displayName": "Cline",
+    "command": "cline",
+    "skipFlag": "--auto-approve true",
+    "resumeFlag": "--taskId",
+    "icon": "/icons/agents/cline.svg",
+    "url": "https://cline.bot/"
+  },
+  {
+    "id": "continue",
+    "displayName": "Continue",
+    "command": "cn",
+    "skipFlag": "--auto",
+    "resumeFlag": "",
+    "icon": "/icons/agents/continue.svg",
+    "url": "https://continue.dev/"
+  },
+  {
+    "id": "openclaw",
+    "displayName": "OpenClaw",
+    "command": "openclaw",
+    "skipFlag": "",
+    "resumeFlag": "",
+    "icon": "/icons/agents/openclaw.svg",
+    "url": "https://openclaw.ai/"
+  },
+  {
+    "id": "kiro",
+    "displayName": "Kiro",
+    "command": "kiro-cli",
+    "skipFlag": "--trust-all-tools",
+    "resumeFlag": "",
+    "icon": "/icons/agents/kiro.svg",
+    "url": "https://kiro.dev/"
+  },
+  {
+    "id": "goose",
+    "displayName": "Goose",
+    "command": "goose",
+    "skipFlag": "",
+    "resumeFlag": "-r",
+    "skipEnv": {
+      "name": "GOOSE_MODE",
+      "value": "auto"
+    },
+    "icon": "/icons/agents/goose.svg",
+    "url": "https://block.github.io/goose/"
+  },
+  {
+    "id": "crush",
+    "displayName": "Charm Crush",
+    "command": "crush",
+    "skipFlag": "--yolo",
+    "resumeFlag": "",
+    "icon": "/icons/agents/crush.png",
+    "url": "https://charm.sh/crush"
+  },
+  {
+    "id": "amp",
+    "displayName": "Amp",
+    "command": "amp",
+    "skipFlag": "--dangerously-allow-all",
+    "resumeFlag": "",
+    "icon": "/icons/agents/amp.svg",
+    "url": "https://ampcode.com/"
+  },
+  {
+    "id": "kimi",
+    "displayName": "Kimi",
+    "command": "kimi",
+    "skipFlag": "--yolo",
+    "resumeFlag": "-r",
+    "icon": "/icons/agents/kimi.svg",
+    "url": "https://kimi.moonshot.cn/"
+  },
+  {
+    "id": "qwen-code",
+    "displayName": "Qwen Code",
+    "command": "qwen",
+    "skipFlag": "--approval-mode yolo",
+    "resumeFlag": "",
+    "icon": "/icons/agents/qwen-code.png",
+    "url": "https://qwen.ai/qwencode"
   },
   {
     "id": "trae",
@@ -142,14 +144,169 @@
     "command": "traecli",
     "skipFlag": "",
     "resumeFlag": "--resume",
-    "icon": "/icons/agents/trae.svg"
+    "icon": "/icons/agents/trae.svg",
+    "url": "https://www.trae.ai/"
   },
   {
-    "id": "zcode",
-    "displayName": "ZCode",
-    "command": "zcode",
+    "id": "codebuddy",
+    "displayName": "CodeBuddy",
+    "command": "codebuddy",
+    "skipFlag": "-y",
+    "resumeFlag": "-r",
+    "icon": "/icons/agents/codebuddy.svg",
+    "url": "https://www.codebuddy.ai/"
+  },
+  {
+    "id": "qoder",
+    "displayName": "Qoder",
+    "command": "qoder",
+    "skipFlag": "--dangerously-skip-permissions",
+    "resumeFlag": "",
+    "icon": "/icons/agents/qoder.svg",
+    "url": "https://qoder.com/"
+  },
+  {
+    "id": "devin",
+    "displayName": "Devin",
+    "command": "devin",
+    "skipFlag": "--permission-mode bypass",
+    "resumeFlag": "--resume",
+    "icon": "/icons/agents/devin.svg",
+    "url": "https://devin.ai/"
+  },
+  {
+    "id": "grok",
+    "displayName": "Grok",
+    "command": "grok",
+    "skipFlag": "--permission-mode bypassPermissions",
+    "resumeFlag": "--resume",
+    "icon": "/icons/agents/grok.svg",
+    "url": "https://grok.com/"
+  },
+  {
+    "id": "antigravity",
+    "displayName": "Antigravity",
+    "command": "agy",
+    "skipFlag": "--dangerously-skip-permissions",
+    "resumeFlag": "--conversation",
+    "icon": "/icons/agents/antigravity.png",
+    "url": "https://antigravity.google/"
+  },
+  {
+    "id": "mistral-vibe",
+    "displayName": "Mistral Vibe",
+    "command": "vibe",
+    "skipFlag": "--agent auto-approve",
+    "resumeFlag": "",
+    "icon": "/icons/agents/mistral-vibe.svg",
+    "url": "https://mistral.ai/"
+  },
+  {
+    "id": "kilo",
+    "displayName": "Kilo Code",
+    "command": "kilo",
     "skipFlag": "",
     "resumeFlag": "",
-    "icon": "/icons/agents/zcode.png"
+    "icon": "/icons/agents/kilo.svg",
+    "url": "https://kilocode.ai/"
+  },
+  {
+    "id": "hermes",
+    "displayName": "Hermes",
+    "command": "hermes",
+    "skipFlag": "--yolo",
+    "resumeFlag": "-r",
+    "icon": "/icons/agents/hermes.png",
+    "url": "https://hermes-agent.nousresearch.com/"
+  },
+  {
+    "id": "pi",
+    "displayName": "Pi",
+    "command": "pi",
+    "skipFlag": "--approve",
+    "resumeFlag": "-r",
+    "icon": "/icons/agents/pi.svg",
+    "url": "https://pi.ai/"
+  },
+  {
+    "id": "droid",
+    "displayName": "Droid",
+    "command": "droid",
+    "skipFlag": "--auto high",
+    "resumeFlag": "--resume",
+    "icon": "/icons/agents/droid.svg",
+    "url": "https://factory.ai/"
+  },
+  {
+    "id": "aug",
+    "displayName": "Auggie",
+    "command": "auggie",
+    "skipFlag": "",
+    "resumeFlag": "",
+    "icon": "/icons/agents/aug.svg",
+    "url": "https://augmentcode.com/"
+  },
+  {
+    "id": "rovo",
+    "displayName": "Rovo Dev",
+    "command": "rovo",
+    "skipFlag": "--yolo",
+    "resumeFlag": "",
+    "icon": "/icons/agents/rovo.svg",
+    "url": "https://rovo.atlassian.com/"
+  },
+  {
+    "id": "prime-agent",
+    "displayName": "Prime Agent",
+    "command": "prime-agent",
+    "skipFlag": "",
+    "resumeFlag": "--resume",
+    "icon": "/icons/agents/prime-agent.png",
+    "url": "https://www.primeintellect.ai/"
+  },
+  {
+    "id": "autohand",
+    "displayName": "Autohand",
+    "command": "autohand",
+    "skipFlag": "--unrestricted",
+    "resumeFlag": "",
+    "icon": "/icons/agents/autohand.svg",
+    "url": "https://autohand.ai/"
+  },
+  {
+    "id": "command-code",
+    "displayName": "Command Code",
+    "command": "command-code",
+    "skipFlag": "--yolo",
+    "resumeFlag": "",
+    "icon": "/icons/agents/command-code.svg",
+    "url": "https://commandcode.ai/"
+  },
+  {
+    "id": "ante",
+    "displayName": "Ante",
+    "command": "ante",
+    "skipFlag": "--yolo",
+    "resumeFlag": "",
+    "icon": "/icons/agents/ante.svg",
+    "url": "https://antigma.ai/"
+  },
+  {
+    "id": "codebuff",
+    "displayName": "Codebuff",
+    "command": "codebuff",
+    "skipFlag": "",
+    "resumeFlag": "",
+    "icon": "/icons/agents/codebuff.png",
+    "url": "https://codebuff.com/"
+  },
+  {
+    "id": "omp",
+    "displayName": "OMP",
+    "command": "omp",
+    "skipFlag": "",
+    "resumeFlag": "--resume",
+    "icon": "/icons/agents/omp.svg",
+    "url": "https://ohmyposh.dev/"
   }
 ]
