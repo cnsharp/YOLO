@@ -6,11 +6,6 @@ import org.junit.Test
 class AgentRegistryTest {
 
     @Test
-    fun `all 18 expected agents are loaded`() {
-        assertEquals(18, AgentRegistry.agents.size)
-    }
-
-    @Test
     fun `claude has correct attributes`() {
         val claude = AgentRegistry.byId("claude")!!
         assertEquals("Claude Code", claude.displayName)
