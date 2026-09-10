@@ -158,10 +158,15 @@ internal val TYPE_NAME_PATTERN: Pattern = Pattern.compile(
  * The class part reuses the multi-separator qualified form (`.` / `::` / `\`; any-case segments) so C#
  * `MyApp.Services.UserService.SomeMethod`, Python `myapp.models.User.save`, etc. are recognized too.
  *
+ * The member name is **not** preceded by a `(?<![.\w])` lookbehind: that anchor would be evaluated at the
+ * position right after the `[.#]` separator, where the preceding char is always `.` or `#`, so it can only
+ * ever succeed for the `#` form and silently rejects the `.` form (`Class.member`) — the primary case the
+ * filter exists for. The `[.#]` separator already guarantees the boundary the lookbehind was meant to enforce.
+ *
  * **Named groups:** `class`, `member`.
  */
 internal val MEMBER_REF_PATTERN: Pattern = Pattern.compile(
-    """(?<class>(?<![.\w/\\])(?:\\?(?:[A-Za-z_][A-Za-z0-9_]*+)(?:(?:\.|::|\\)[A-Za-z_][A-Za-z0-9_]*+)+)|[A-Z][a-zA-Z0-9_]*+)[.#](?<member>(?<![.\w])[A-Za-z_]\w*)"""
+    """(?<class>(?<![.\w/\\])(?:\\?(?:[A-Za-z_][A-Za-z0-9_]*+)(?:(?:\.|::|\\)[A-Za-z_][A-Za-z0-9_]*+)+)|[A-Z][a-zA-Z0-9_]*+)[.#](?<member>[A-Za-z_]\w*)"""
 )
 
 /** `http(s)://` URLs (no trailing whitespace/quote/bracket). Drives [com.cnsharp.yolo.panel.UrlLinkFilter]. */
