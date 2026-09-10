@@ -13,7 +13,7 @@
     "displayName": "Codex",
     "command": "codex",
     "skipFlag": "--yolo",
-    "resumeFlag": "--resume",
+    "resumeFlag": "resume --last",
     "icon": "/icons/agents/codex.svg",
     "url": "https://openai.com/codex"
   },
