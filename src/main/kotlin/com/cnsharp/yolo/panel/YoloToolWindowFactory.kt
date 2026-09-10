@@ -588,7 +588,7 @@ private class YoloPanel(
         val ptyCommand = if (SystemInfo.isWindows) arrayOf("cmd", "/c", shellCmd)
         else arrayOf("zsh", "-lic", shellCmd)
 
-        LOG.info("Agent YOLO: starting agent=${row.displayName}, command=$shellCmd")
+        LOG.info("${Yolo.NAME}: starting agent=${row.displayName}, command=$shellCmd")
 
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
@@ -672,11 +672,11 @@ private class YoloPanel(
                         // as SIGINT instead of being intercepted by IDEA's global Copy shortcut.
                         SwingUtilities.invokeLater { widget.getTerminalPanel().requestFocusInWindow() }
                     } catch (e: Exception) {
-                        LOG.warn("Agent YOLO: failed to embed terminal for ${row.displayName}", e)
+                        LOG.warn("${Yolo.NAME}: failed to embed terminal for ${row.displayName}", e)
                     }
                 }
             } catch (e: Exception) {
-                LOG.warn("Agent YOLO: failed to start agent ${row.displayName}", e)
+                LOG.warn("${Yolo.NAME}: failed to start agent ${row.displayName}", e)
             }
         }
     }

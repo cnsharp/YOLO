@@ -4,9 +4,12 @@ import com.cnsharp.yolo.settings.AgentRegistry
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.IconLoader
-import com.intellij.util.IconUtil
+import java.awt.Component
+import java.awt.Graphics
+import java.awt.Graphics2D
 import java.io.File
 import javax.swing.Icon
+import kotlin.math.max
 
 /**
  * Icons displayed for custom tools in the dropdown list.
@@ -75,20 +78,19 @@ object AgentIcons {
 
         val file = File(path)
         if (!file.isFile) {
-            LOG.warn("Agent YOLO: icon file does not exist, ignored: $path")
+            LOG.warn("${Yolo.NAME}: icon file does not exist, ignored: $path")
             return null
         }
         return try {
             val raw = IconLoader.findIcon(file.toURI().toURL())
             if (raw == null) {
-                LOG.warn("Agent YOLO: unrecognized icon format, ignored: $path")
+                LOG.warn("${Yolo.NAME}: unrecognized icon format, ignored: $path")
                 return null
             }
             // User icons may not be 16x16; scale to standard size to avoid breaking the dropdown row height
-            if (raw.iconWidth == SIZE && raw.iconHeight == SIZE) raw
-            else IconUtil.resizeSquared(raw, SIZE)
+            fitToSize(raw)
         } catch (e: Exception) {
-            LOG.warn("Agent YOLO: icon load failed, ignored: $path", e)
+            LOG.warn("${Yolo.NAME}: icon load failed, ignored: $path", e)
             null
         }
     }
@@ -96,10 +98,35 @@ object AgentIcons {
     private fun loadBundled(path: String): Icon =
         try {
             val raw = IconLoader.getIcon(path, AgentIcons::class.java.classLoader)
-            if (raw.iconWidth == SIZE && raw.iconHeight == SIZE) raw
-            else IconUtil.resizeSquared(raw, SIZE)
+            fitToSize(raw)
         } catch (e: Exception) {
-            LOG.warn("Agent YOLO: bundled icon load failed: $path", e)
+            LOG.warn("${Yolo.NAME}: bundled icon load failed: $path", e)
             DEFAULT
         }
+
+    /**
+     * Force any icon (SVG or bitmap, any source size) to render at exactly [SIZE]x[SIZE], scaled to fit.
+     *
+     * [com.intellij.util.IconUtil.resizeSquared] leaves large-source SVGs/PNGs at their native size in some
+     * IntelliJ versions (e.g. the 248x248 `claude.svg` / large `hermes.png` showed up oversized in the
+     * dropdown), so we wrap the source and do the scaling ourselves in [paintIcon].
+     */
+    private fun fitToSize(icon: Icon): Icon {
+        if (icon.iconWidth == SIZE && icon.iconHeight == SIZE) return icon
+        return object : Icon {
+            override fun getIconWidth(): Int = SIZE
+            override fun getIconHeight(): Int = SIZE
+            override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
+                val w = icon.iconWidth
+                val h = icon.iconHeight
+                if (w <= 0 || h <= 0) return
+                val scale = SIZE.toDouble() / max(w, h)
+                val g2 = g.create() as Graphics2D
+                g2.translate(x, y)
+                g2.scale(scale, scale)
+                icon.paintIcon(c, g2, 0, 0)
+                g2.dispose()
+            }
+        }
+    }
 }
