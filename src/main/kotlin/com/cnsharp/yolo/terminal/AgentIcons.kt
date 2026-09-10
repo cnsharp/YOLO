@@ -1,6 +1,8 @@
 package com.cnsharp.yolo.terminal
 
+import com.cnsharp.yolo.Yolo
 import com.cnsharp.yolo.settings.AgentRegistry
+import com.cnsharp.yolo.terminal.AgentIcons.SIZE
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.IconLoader
@@ -129,4 +131,5 @@ object AgentIcons {
             }
         }
     }
+
 }
